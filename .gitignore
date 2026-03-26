@@ -34,3 +34,10 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Spec Kit temporary/working files ###
+.speckit/.cache/
+.speckit/.tmp/
+
+###  Claude Code local state ###
+.claude/settings.local.json

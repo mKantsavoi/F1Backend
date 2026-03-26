@@ -1,0 +1,1 @@
+- [Constitution](constitution.md) — Project governance: Clean Architecture, TDD, Ktor-only, tech stack constraints
