@@ -41,3 +41,10 @@ out/
 
 ###  Claude Code local state ###
 .claude/settings.local.json
+.claude/settings.json
+
+# gemini-cli settings
+.gemini/
+
+# GitHub App credentials
+gha-creds-*.json
