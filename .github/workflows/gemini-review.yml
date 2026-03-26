@@ -1,0 +1,28 @@
+name: Gemini AI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    if: ${{ github.event_name == 'pull_request' || contains(github.event.comment.body, '/gemini-review') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gemini AI Code Review
+        uses: truongnh1992/gemini-ai-code-reviewer@latest
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          model: "gemini-3.1-pro"
