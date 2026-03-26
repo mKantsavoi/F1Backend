@@ -9,11 +9,13 @@ import org.jetbrains.exposed.v1.jdbc.*
 import java.time.Instant
 import java.util.UUID
 import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 class ExposedRefreshTokenRepository : RefreshTokenRepository {
 
-    private fun UUID.toKUuid(): Uuid = Uuid.parse(this.toString())
-    private fun Uuid.toJUuid(): UUID = UUID.fromString(this.toString())
+    private fun UUID.toKUuid(): Uuid = this.toKotlinUuid()
+    private fun Uuid.toJUuid(): UUID = this.toJavaUuid()
 
     override suspend fun findByTokenHash(tokenHash: String): RefreshToken? = dbQuery {
         RefreshTokensTable.selectAll()

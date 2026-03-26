@@ -10,11 +10,13 @@ import org.jetbrains.exposed.v1.jdbc.*
 import java.time.Instant
 import java.util.UUID
 import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 class ExposedUserRepository : UserRepository {
 
-    private fun UUID.toKUuid(): Uuid = Uuid.parse(this.toString())
-    private fun Uuid.toJUuid(): UUID = UUID.fromString(this.toString())
+    private fun UUID.toKUuid(): Uuid = this.toKotlinUuid()
+    private fun Uuid.toJUuid(): UUID = this.toJavaUuid()
 
     override suspend fun findById(id: UUID): User? = dbQuery {
         UsersTable.selectAll().where { UsersTable.id eq id.toKUuid() }.singleOrNull()?.toUser()
