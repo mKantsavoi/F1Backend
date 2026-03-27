@@ -4,11 +4,13 @@ import com.blaizmiko.f1backend.domain.port.CircuitDataSource
 import com.blaizmiko.f1backend.domain.port.DriverDataSource
 import com.blaizmiko.f1backend.domain.port.RaceDataSource
 import com.blaizmiko.f1backend.domain.port.ScheduleDataSource
+import com.blaizmiko.f1backend.domain.port.StandingsDataSource
 import com.blaizmiko.f1backend.domain.port.TeamDataSource
 import com.blaizmiko.f1backend.infrastructure.external.client.JolpicaDriverClient
 import com.blaizmiko.f1backend.infrastructure.external.client.JolpicaHttpClient
 import com.blaizmiko.f1backend.infrastructure.external.client.JolpicaRaceClient
 import com.blaizmiko.f1backend.infrastructure.external.client.JolpicaScheduleClient
+import com.blaizmiko.f1backend.infrastructure.external.client.JolpicaStandingsClient
 import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.withOptions
 import org.koin.dsl.bind
@@ -25,4 +27,5 @@ val clientModule =
         single<CircuitDataSource> { get<JolpicaDriverClient>() }
         single { JolpicaScheduleClient(get()) } bind ScheduleDataSource::class
         single { JolpicaRaceClient(get()) } bind RaceDataSource::class
+        single { JolpicaStandingsClient(get()) } bind StandingsDataSource::class
     }

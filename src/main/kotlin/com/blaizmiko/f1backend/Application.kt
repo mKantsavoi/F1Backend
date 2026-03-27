@@ -8,6 +8,7 @@ import com.blaizmiko.f1backend.infrastructure.di.coreModule
 import com.blaizmiko.f1backend.infrastructure.di.driversModule
 import com.blaizmiko.f1backend.infrastructure.di.racesModule
 import com.blaizmiko.f1backend.infrastructure.di.scheduleModule
+import com.blaizmiko.f1backend.infrastructure.di.standingsModule
 import com.blaizmiko.f1backend.infrastructure.di.teamsModule
 import com.blaizmiko.f1backend.infrastructure.persistence.DatabaseFactory
 import com.blaizmiko.f1backend.infrastructure.security.JwtProvider
@@ -37,6 +38,7 @@ fun Application.module() {
             circuitsModule,
             scheduleModule,
             racesModule,
+            standingsModule,
         )
     }
 

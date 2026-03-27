@@ -181,3 +181,69 @@ data class JolpicaQualifyingResult(
     @SerialName("Q2") val q2: String = "",
     @SerialName("Q3") val q3: String = "",
 )
+
+// Driver standings models
+@Serializable
+data class JolpicaDriverStandingsResponse(
+    @SerialName("MRData") val mrData: DriverStandingsMRData,
+)
+
+@Serializable
+data class DriverStandingsMRData(
+    @SerialName("StandingsTable") val standingsTable: DriverStandingsTable,
+)
+
+@Serializable
+data class DriverStandingsTable(
+    val season: String = "",
+    @SerialName("StandingsLists") val standingsLists: List<DriverStandingsList> = emptyList(),
+)
+
+@Serializable
+data class DriverStandingsList(
+    val season: String = "",
+    val round: String = "",
+    @SerialName("DriverStandings") val driverStandings: List<JolpicaDriverStanding> = emptyList(),
+)
+
+@Serializable
+data class JolpicaDriverStanding(
+    val position: String,
+    val points: String = "0",
+    val wins: String = "0",
+    @SerialName("Driver") val driver: JolpicaDriver,
+    @SerialName("Constructors") val constructors: List<JolpicaConstructor> = emptyList(),
+)
+
+// Constructor standings models
+@Serializable
+data class JolpicaConstructorStandingsResponse(
+    @SerialName("MRData") val mrData: ConstructorStandingsMRData,
+)
+
+@Serializable
+data class ConstructorStandingsMRData(
+    @SerialName("StandingsTable") val standingsTable: ConstructorStandingsTable,
+)
+
+@Serializable
+data class ConstructorStandingsTable(
+    val season: String = "",
+    @SerialName("StandingsLists") val standingsLists: List<ConstructorStandingsList> = emptyList(),
+)
+
+@Serializable
+data class ConstructorStandingsList(
+    val season: String = "",
+    val round: String = "",
+    @SerialName("ConstructorStandings")
+    val constructorStandings: List<JolpicaConstructorStanding> = emptyList(),
+)
+
+@Serializable
+data class JolpicaConstructorStanding(
+    val position: String,
+    val points: String = "0",
+    val wins: String = "0",
+    @SerialName("Constructor") val constructor: JolpicaConstructor,
+)

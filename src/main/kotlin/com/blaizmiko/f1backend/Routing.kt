@@ -6,6 +6,7 @@ import com.blaizmiko.f1backend.adapter.route.circuitRoutes
 import com.blaizmiko.f1backend.adapter.route.driverRoutes
 import com.blaizmiko.f1backend.adapter.route.raceRoutes
 import com.blaizmiko.f1backend.adapter.route.scheduleRoutes
+import com.blaizmiko.f1backend.adapter.route.standingsRoutes
 import com.blaizmiko.f1backend.adapter.route.teamRoutes
 import com.blaizmiko.f1backend.domain.model.AuthenticationException
 import com.blaizmiko.f1backend.domain.model.ConflictException
@@ -68,6 +69,7 @@ fun Application.configureRouting() {
                 circuitRoutes()
                 scheduleRoutes()
                 raceRoutes()
+                standingsRoutes()
             }
         }
     }
