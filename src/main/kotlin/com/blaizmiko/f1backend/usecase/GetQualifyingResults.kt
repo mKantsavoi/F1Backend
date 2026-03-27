@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import java.time.Year
 import java.util.concurrent.ConcurrentHashMap
 
 data class QualifyingResultsResult(
@@ -26,6 +27,7 @@ class GetQualifyingResults(
 ) {
     companion object {
         private const val RETRY_THROTTLE_SECONDS = 60L
+        private const val CURRENT_SEASON_TTL_SECONDS = 300L
     }
 
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
@@ -74,11 +76,12 @@ class GetQualifyingResults(
         try {
             val data = dataSource.fetchQualifyingResults(season, round)
             val now = Instant.now()
+            val isCurrentSeason = season == Year.now().value.toString()
             val entry =
                 CacheEntry(
                     data = data as Any,
                     fetchedAt = now,
-                    expiresAt = Instant.MAX,
+                    expiresAt = if (isCurrentSeason) now.plusSeconds(CURRENT_SEASON_TTL_SECONDS) else Instant.MAX,
                 )
             cache.put(key, entry)
             lastFailedAttempt.remove(key)
