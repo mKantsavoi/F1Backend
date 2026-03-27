@@ -4,6 +4,7 @@ import com.blaizmiko.f1backend.adapter.dto.TeamsResponse
 import com.blaizmiko.f1backend.adapter.route.teamRoutes
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
+import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.model.Team
 import com.blaizmiko.f1backend.domain.port.TeamCache
 import com.blaizmiko.f1backend.domain.port.TeamDataSource
@@ -214,7 +215,7 @@ class TeamsEndpointTest :
             cache.put(
                 "current",
                 CacheEntry(
-                    data = sampleTeams,
+                    data = SeasonCache("2026", sampleTeams),
                     fetchedAt = Instant.now().minusSeconds(90_000),
                     expiresAt = Instant.now().minusSeconds(3_600),
                 ),

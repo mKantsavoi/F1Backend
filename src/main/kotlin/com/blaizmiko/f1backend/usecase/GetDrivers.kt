@@ -3,6 +3,7 @@ package com.blaizmiko.f1backend.usecase
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.Driver
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
+import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.port.DriverCache
 import com.blaizmiko.f1backend.domain.port.DriverDataSource
 import kotlinx.coroutines.CancellationException
@@ -28,13 +29,12 @@ class GetDrivers(
     }
 
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
-    private val resolvedSeasons = ConcurrentHashMap<String, String>()
     private val lastFailedAttempt = ConcurrentHashMap<String, Instant>()
 
     suspend fun execute(season: String = "current"): DriversResult {
         val quickCached = cache.get(season)
         if (quickCached != null && quickCached.isFresh()) {
-            return freshResult(season, quickCached.data)
+            return freshResult(quickCached.data)
         }
 
         val mutex = fetchMutexes.getOrPut(season) { Mutex() }
@@ -45,8 +45,8 @@ class GetDrivers(
         val cached = cache.get(season)
 
         return when {
-            cached != null && cached.isFresh() -> freshResult(season, cached.data)
-            isThrottled(season) -> staleOrThrow(season, cached)
+            cached != null && cached.isFresh() -> freshResult(cached.data)
+            isThrottled(season) -> staleOrThrow(cached)
             else -> tryFetch(season, cached)
         }
     }
@@ -59,19 +59,18 @@ class GetDrivers(
     @Suppress("TooGenericExceptionCaught")
     private suspend fun tryFetch(
         season: String,
-        cached: CacheEntry<List<Driver>>?,
+        cached: CacheEntry<SeasonCache<Driver>>?,
     ): DriversResult =
         try {
             val (resolvedSeason, drivers) = dataSource.fetchDrivers(season)
             val now = Instant.now()
             val entry =
                 CacheEntry(
-                    data = drivers,
+                    data = SeasonCache(resolvedSeason, drivers),
                     fetchedAt = now,
                     expiresAt = now.plusSeconds(cacheTtlHours * SECONDS_PER_HOUR),
                 )
             cache.put(season, entry)
-            resolvedSeasons[season] = resolvedSeason
             lastFailedAttempt.remove(season)
 
             DriversResult(season = resolvedSeason, drivers = drivers, isStale = false)
@@ -79,27 +78,21 @@ class GetDrivers(
             throw e
         } catch (_: Exception) {
             lastFailedAttempt[season] = Instant.now()
-            staleOrThrow(season, cached)
+            staleOrThrow(cached)
         }
 
-    private fun freshResult(
-        season: String,
-        drivers: List<Driver>,
-    ): DriversResult =
+    private fun freshResult(data: SeasonCache<Driver>): DriversResult =
         DriversResult(
-            season = resolvedSeasons[season] ?: season,
-            drivers = drivers,
+            season = data.resolvedSeason,
+            drivers = data.items,
             isStale = false,
         )
 
-    private fun staleOrThrow(
-        season: String,
-        cached: CacheEntry<List<Driver>>?,
-    ): DriversResult {
+    private fun staleOrThrow(cached: CacheEntry<SeasonCache<Driver>>?): DriversResult {
         if (cached != null) {
             return DriversResult(
-                season = resolvedSeasons[season] ?: season,
-                drivers = cached.data,
+                season = cached.data.resolvedSeason,
+                drivers = cached.data.items,
                 isStale = true,
             )
         }

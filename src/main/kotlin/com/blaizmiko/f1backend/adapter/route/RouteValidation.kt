@@ -5,6 +5,7 @@ import com.blaizmiko.f1backend.domain.model.ValidationException
 import java.time.Year
 
 fun validateSeason(season: String) {
+    if (season == "current") return
     val year = season.toIntOrNull()
     val currentYear = Year.now().value
     if (year == null || year < FIRST_F1_SEASON || year > currentYear) {

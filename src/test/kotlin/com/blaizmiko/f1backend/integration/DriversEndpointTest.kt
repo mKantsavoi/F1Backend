@@ -6,6 +6,7 @@ import com.blaizmiko.f1backend.adapter.route.driverRoutes
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.Driver
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
+import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.port.DriverCache
 import com.blaizmiko.f1backend.domain.port.DriverDataSource
 import com.blaizmiko.f1backend.infrastructure.cache.InMemoryDriverCache
@@ -197,7 +198,7 @@ class DriversEndpointTest :
             cache.put(
                 "current",
                 CacheEntry(
-                    data = sampleDrivers,
+                    data = SeasonCache("2026", sampleDrivers),
                     fetchedAt = Instant.now().minusSeconds(90_000),
                     expiresAt = Instant.now().minusSeconds(3_600),
                 ),

@@ -2,6 +2,7 @@ package com.blaizmiko.f1backend.usecase
 
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
+import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.model.Team
 import com.blaizmiko.f1backend.domain.port.TeamCache
 import com.blaizmiko.f1backend.domain.port.TeamDataSource
@@ -28,13 +29,12 @@ class GetTeams(
     }
 
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
-    private val resolvedSeasons = ConcurrentHashMap<String, String>()
     private val lastFailedAttempt = ConcurrentHashMap<String, Instant>()
 
     suspend fun execute(season: String = "current"): TeamsResult {
         val quickCached = cache.get(season)
         if (quickCached != null && quickCached.isFresh()) {
-            return freshResult(season, quickCached.data)
+            return freshResult(quickCached.data)
         }
 
         val mutex = fetchMutexes.getOrPut(season) { Mutex() }
@@ -45,8 +45,8 @@ class GetTeams(
         val cached = cache.get(season)
 
         return when {
-            cached != null && cached.isFresh() -> freshResult(season, cached.data)
-            isThrottled(season) -> staleOrThrow(season, cached)
+            cached != null && cached.isFresh() -> freshResult(cached.data)
+            isThrottled(season) -> staleOrThrow(cached)
             else -> tryFetch(season, cached)
         }
     }
@@ -59,19 +59,18 @@ class GetTeams(
     @Suppress("TooGenericExceptionCaught")
     private suspend fun tryFetch(
         season: String,
-        cached: CacheEntry<List<Team>>?,
+        cached: CacheEntry<SeasonCache<Team>>?,
     ): TeamsResult =
         try {
             val (resolvedSeason, teams) = dataSource.fetchTeams(season)
             val now = Instant.now()
             val entry =
                 CacheEntry(
-                    data = teams,
+                    data = SeasonCache(resolvedSeason, teams),
                     fetchedAt = now,
                     expiresAt = now.plusSeconds(cacheTtlHours * SECONDS_PER_HOUR),
                 )
             cache.put(season, entry)
-            resolvedSeasons[season] = resolvedSeason
             lastFailedAttempt.remove(season)
 
             TeamsResult(season = resolvedSeason, teams = teams, isStale = false)
@@ -79,27 +78,21 @@ class GetTeams(
             throw e
         } catch (_: Exception) {
             lastFailedAttempt[season] = Instant.now()
-            staleOrThrow(season, cached)
+            staleOrThrow(cached)
         }
 
-    private fun freshResult(
-        season: String,
-        teams: List<Team>,
-    ): TeamsResult =
+    private fun freshResult(data: SeasonCache<Team>): TeamsResult =
         TeamsResult(
-            season = resolvedSeasons[season] ?: season,
-            teams = teams,
+            season = data.resolvedSeason,
+            teams = data.items,
             isStale = false,
         )
 
-    private fun staleOrThrow(
-        season: String,
-        cached: CacheEntry<List<Team>>?,
-    ): TeamsResult {
+    private fun staleOrThrow(cached: CacheEntry<SeasonCache<Team>>?): TeamsResult {
         if (cached != null) {
             return TeamsResult(
-                season = resolvedSeasons[season] ?: season,
-                teams = cached.data,
+                season = cached.data.resolvedSeason,
+                teams = cached.data.items,
                 isStale = true,
             )
         }
