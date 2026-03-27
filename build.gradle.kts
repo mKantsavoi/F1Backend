@@ -42,12 +42,18 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)
 
+    implementation(platform(libs.koin.bom))
+    implementation(libs.koin.ktor)
+    implementation(libs.koin.logger.slf4j)
+
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.koin.test)
+    testImplementation(libs.koin.test.junit5)
 }
 
 tasks.withType<Test>().configureEach {

@@ -1,7 +1,7 @@
 ktor:
     application:
         modules:
-            - com.blaizmiko.ApplicationKt.module
+            - com.blaizmiko.f1backend.ApplicationKt.module
     deployment:
         port: 8080
 
