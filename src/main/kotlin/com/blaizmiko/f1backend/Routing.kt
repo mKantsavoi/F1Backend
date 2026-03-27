@@ -4,10 +4,13 @@ import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
 import com.blaizmiko.f1backend.adapter.route.authRoutes
 import com.blaizmiko.f1backend.adapter.route.circuitRoutes
 import com.blaizmiko.f1backend.adapter.route.driverRoutes
+import com.blaizmiko.f1backend.adapter.route.raceRoutes
+import com.blaizmiko.f1backend.adapter.route.scheduleRoutes
 import com.blaizmiko.f1backend.adapter.route.teamRoutes
 import com.blaizmiko.f1backend.domain.model.AuthenticationException
 import com.blaizmiko.f1backend.domain.model.ConflictException
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
+import com.blaizmiko.f1backend.domain.model.NotFoundException
 import com.blaizmiko.f1backend.domain.model.ValidationException
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -44,6 +47,9 @@ fun Application.configureStatusPages() {
         exception<ConflictException> { call, cause ->
             call.respond(HttpStatusCode.Conflict, ErrorResponse("email_taken", cause.message))
         }
+        exception<NotFoundException> { call, cause ->
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", cause.message))
+        }
         exception<ExternalServiceException> { call, cause ->
             call.respond(HttpStatusCode.BadGateway, ErrorResponse("external_service_unavailable", cause.message))
         }
@@ -60,6 +66,8 @@ fun Application.configureRouting() {
                 driverRoutes()
                 teamRoutes()
                 circuitRoutes()
+                scheduleRoutes()
+                raceRoutes()
             }
         }
     }

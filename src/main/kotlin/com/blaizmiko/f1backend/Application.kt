@@ -6,6 +6,8 @@ import com.blaizmiko.f1backend.infrastructure.di.circuitsModule
 import com.blaizmiko.f1backend.infrastructure.di.clientModule
 import com.blaizmiko.f1backend.infrastructure.di.coreModule
 import com.blaizmiko.f1backend.infrastructure.di.driversModule
+import com.blaizmiko.f1backend.infrastructure.di.racesModule
+import com.blaizmiko.f1backend.infrastructure.di.scheduleModule
 import com.blaizmiko.f1backend.infrastructure.di.teamsModule
 import com.blaizmiko.f1backend.infrastructure.persistence.DatabaseFactory
 import com.blaizmiko.f1backend.infrastructure.security.JwtProvider
@@ -26,7 +28,16 @@ fun Application.module() {
 
     install(Koin) {
         slf4jLogger()
-        modules(coreModule(appConfig), clientModule, authModule, driversModule, teamsModule, circuitsModule)
+        modules(
+            coreModule(appConfig),
+            clientModule,
+            authModule,
+            driversModule,
+            teamsModule,
+            circuitsModule,
+            scheduleModule,
+            racesModule,
+        )
     }
 
     DatabaseFactory.init(appConfig.database)
