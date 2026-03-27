@@ -9,7 +9,7 @@ data class DatabaseConfig(
     val maxPoolSize: Int = DEFAULT_MAX_POOL_SIZE,
 ) {
     companion object {
-        private const val DEFAULT_MAX_POOL_SIZE = 10
+        const val DEFAULT_MAX_POOL_SIZE = 10
     }
 }
 
@@ -45,6 +45,9 @@ fun Application.loadAppConfig(): AppConfig {
                 url = dbConfig.property("url").getString(),
                 user = dbConfig.property("user").getString(),
                 password = dbConfig.property("password").getString(),
+                maxPoolSize =
+                    dbConfig.propertyOrNull("maxPoolSize")?.getString()?.toInt()
+                        ?: DatabaseConfig.DEFAULT_MAX_POOL_SIZE,
             ),
         jwt =
             JwtConfig(
