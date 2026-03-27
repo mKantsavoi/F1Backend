@@ -1,14 +1,17 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.2.0 → 1.3.0 (MINOR: new principle added)
+  Version change: 1.3.0 → 1.5.0 (MINOR: two new principles added)
   Modified principles: None
   Added sections:
-    - VI. Dependency Verification via Context7
+    - VII. Dependency Injection via Koin
+    - VIII. Static Analysis & Code Style
+  Added to Technology Stack table:
+    - Dependency injection row (Koin)
   Removed sections: None
   Templates requiring updates:
     - .specify/templates/plan-template.md — ✅ no updates needed
-      (Constitution Check section is generic; picks up new principle)
+      (Constitution Check section is generic; picks up new principles)
     - .specify/templates/spec-template.md — ✅ no updates needed
     - .specify/templates/tasks-template.md — ✅ no updates needed
   Follow-up TODOs: None
@@ -126,6 +129,74 @@ for correct API usage.
   explicit approval before proceeding with training-data
   assumptions.
 
+### VII. Dependency Injection via Koin
+
+All dependency wiring MUST use Koin. Manual construction
+of services in routes or application modules is prohibited.
+
+- **One Koin module per feature**: Each feature domain
+  (auth, drivers, teams, circuits, etc.) MUST have its own
+  Koin module file in `infrastructure/di/`. Mixing
+  unrelated bindings in a single module is prohibited.
+- **Shared infrastructure modules**: Cross-cutting clients
+  (e.g., `clientModule` for HTTP clients) and core config
+  (`coreModule`) MUST remain in dedicated modules, separate
+  from feature modules.
+- **Single scope for use cases**: Use cases MUST be
+  registered as `single` (singleton) scope, not `factory`.
+  Use cases hold caches and mutexes that MUST persist
+  across requests.
+- **Interface binding**: Infrastructure implementations
+  MUST be bound to their domain port interfaces using
+  Koin's `bind` operator (e.g.,
+  `single { InMemoryDriverCache() } bind DriverCache::class`).
+  Routes and use cases MUST depend on port interfaces,
+  never on concrete implementations.
+- **Resource cleanup**: Clients that hold resources
+  (HTTP connections, database pools) MUST register an
+  `onClose` hook in their Koin module to ensure proper
+  shutdown.
+- **Module registration**: All Koin modules MUST be
+  registered in `Application.kt` via the `modules()`
+  call inside `install(Koin)`. No lazy or conditional
+  module loading.
+- **Test isolation**: Integration tests MUST create their
+  own Koin module with test doubles (fakes, not mocks)
+  rather than reusing production modules. This ensures
+  tests are deterministic and do not depend on external
+  services.
+
+### VIII. Static Analysis & Code Style
+
+All code MUST pass **ktlint** and **detekt** with zero
+violations before being committed or merged.
+
+- **ktlint** enforces the Kotlin coding conventions and
+  project-specific formatting rules. The canonical
+  configuration is managed via the ktlint Gradle plugin
+  (`org.jlleitschuh.gradle.ktlint`).
+- **detekt** enforces static analysis rules for code
+  complexity, potential bugs, and style. The default
+  detekt rule set applies unless explicitly overridden
+  in `detekt.yml`.
+- Developers MUST run `./gradlew ktlintCheck detekt`
+  locally before pushing. CI pipelines MUST also enforce
+  both checks as blocking gates.
+- `@Suppress` annotations for detekt rules are permitted
+  only when the suppression is justified by a comment
+  explaining why the rule does not apply (e.g.,
+  `@Suppress("TooGenericExceptionCaught")` with a
+  rationale for catching broad exceptions in retry logic).
+  Blanket suppressions of entire files or rule sets are
+  prohibited.
+- **Auto-formatting**: `./gradlew ktlintFormat` MAY be
+  used to auto-fix formatting issues, but the developer
+  MUST review the changes before committing. Blind
+  auto-format commits are discouraged.
+- New custom detekt rules or ktlint overrides MUST be
+  proposed as a constitution amendment if they relax
+  existing standards.
+
 ## Technology Stack
 
 The following technology choices are non-negotiable for
@@ -136,6 +207,7 @@ this project:
 | Language           | Kotlin 2.x                          |
 | Framework          | Ktor (latest stable)                |
 | Build system       | Gradle Kotlin DSL                   |
+| Dependency inject. | Koin (latest stable)                |
 | Database           | PostgreSQL via Exposed ORM          |
 | Serialization      | kotlinx.serialization               |
 | Testing            | kotest + ktor-server-test-host      |
@@ -207,4 +279,4 @@ agreements, personal preferences, and ad-hoc practices.
 adherence to these principles. Constitution violations are
 blocking issues.
 
-**Version**: 1.3.0 | **Ratified**: 2026-03-26 | **Last Amended**: 2026-03-26
+**Version**: 1.5.0 | **Ratified**: 2026-03-26 | **Last Amended**: 2026-03-27
