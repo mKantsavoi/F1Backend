@@ -38,8 +38,12 @@ dependencies {
     implementation(libs.postgresql)
     implementation(libs.bcrypt)
 
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
+
     testImplementation(libs.ktor.server.test.host)
-    testImplementation(libs.ktor.client.content.negotiation)
+    testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.testcontainers)
