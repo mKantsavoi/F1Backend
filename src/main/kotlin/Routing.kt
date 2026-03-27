@@ -61,6 +61,10 @@ fun Application.configureRouting(appConfig: AppConfig, jwtProvider: JwtProvider)
     val driverCache = InMemoryDriverCache()
     val getDrivers = GetDrivers(driverCache, jolpicaClient, appConfig.jolpica.cacheTtlHours)
 
+    environment.monitor.subscribe(ApplicationStopped) {
+        jolpicaClient.close()
+    }
+
     routing {
         route("/api/v1/auth") {
             authRoutes(userRepository, refreshTokenRepository, jwtProvider, appConfig)

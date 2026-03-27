@@ -156,6 +156,10 @@ class DriversEndpointTest : StringSpec({
             val response = client.get("/api/v1/drivers") { bearerAuth(token) }
             response.status shouldBe HttpStatusCode.OK
             dataSource.callCount shouldBe 1
+
+            // Cached response should return resolved season, not "current"
+            val body = response.body<DriversResponse>()
+            body.season shouldBe "2026"
         }
     }
 

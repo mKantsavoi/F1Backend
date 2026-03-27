@@ -13,7 +13,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
 
-class JolpicaClient(private val config: JolpicaConfig) : DriverDataSource {
+class JolpicaClient(private val config: JolpicaConfig) : DriverDataSource, java.io.Closeable {
 
     private val httpClient = HttpClient(CIO) {
         install(HttpRequestRetry) {
@@ -33,8 +33,12 @@ class JolpicaClient(private val config: JolpicaConfig) : DriverDataSource {
         }
     }
 
+    override fun close() {
+        httpClient.close()
+    }
+
     override suspend fun fetchDrivers(season: String): Pair<String, List<Driver>> {
-        val response: JolpicaResponse = httpClient.get("${config.baseUrl}/$season/drivers.json").body()
+        val response: JolpicaResponse = httpClient.get("${config.baseUrl}/$season/drivers.json?limit=100").body()
         val driverTable = response.mrData.driverTable
         val drivers = driverTable.drivers.map { it.toDomain() }
         return driverTable.season to drivers
