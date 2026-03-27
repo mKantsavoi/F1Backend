@@ -1,7 +1,9 @@
 package com.blaizmiko.f1backend.infrastructure.external
 
 import com.blaizmiko.f1backend.domain.model.Circuit
+import com.blaizmiko.f1backend.domain.model.ConstructorStanding
 import com.blaizmiko.f1backend.domain.model.Driver
+import com.blaizmiko.f1backend.domain.model.DriverStanding
 import com.blaizmiko.f1backend.domain.model.FastestLap
 import com.blaizmiko.f1backend.domain.model.QualifyingResult
 import com.blaizmiko.f1backend.domain.model.RaceResult
@@ -99,4 +101,29 @@ internal fun JolpicaQualifyingResult.toDomainQualifyingResult(): QualifyingResul
         q1 = q1.ifBlank { null },
         q2 = q2.ifBlank { null },
         q3 = q3.ifBlank { null },
+    )
+
+internal fun JolpicaDriverStanding.toDomainDriverStanding(): DriverStanding {
+    val team = constructors.firstOrNull()
+    return DriverStanding(
+        position = position.toIntOrNull() ?: 0,
+        driverId = driver.driverId,
+        driverCode = driver.code,
+        driverName = "${driver.givenName} ${driver.familyName}",
+        nationality = driver.nationality,
+        teamId = team?.constructorId ?: "",
+        teamName = team?.name ?: "",
+        points = points.toDoubleOrNull() ?: 0.0,
+        wins = wins.toIntOrNull() ?: 0,
+    )
+}
+
+internal fun JolpicaConstructorStanding.toDomainConstructorStanding(): ConstructorStanding =
+    ConstructorStanding(
+        position = position.toIntOrNull() ?: 0,
+        teamId = constructor.constructorId,
+        teamName = constructor.name,
+        nationality = constructor.nationality,
+        points = points.toDoubleOrNull() ?: 0.0,
+        wins = wins.toIntOrNull() ?: 0,
     )
