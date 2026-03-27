@@ -20,11 +20,11 @@ val authModule = module {
     single { ExposedUserRepository() } bind UserRepository::class
     single { ExposedRefreshTokenRepository() } bind RefreshTokenRepository::class
 
-    factory { RegisterUser(get(), get(), get(), get()) }
-    factory { LoginUser(get(), get(), get(), get()) }
-    factory { RefreshTokens(get(), get(), get(), get()) }
-    factory { GetProfile(get()) }
-    factory { UpdateProfile(get()) }
-    factory { ChangePassword(get()) }
-    factory { LogoutUser(get()) }
+    single { RegisterUser(get(), get(), get(), get()) }
+    single { LoginUser(get(), get(), get(), get()) }
+    single { RefreshTokens(get(), get(), get(), get()) }
+    single { GetProfile(get()) }
+    single { UpdateProfile(get()) }
+    single { ChangePassword(get()) }
+    single { LogoutUser(get()) }
 }

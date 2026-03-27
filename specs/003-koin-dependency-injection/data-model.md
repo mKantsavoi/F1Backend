@@ -26,7 +26,7 @@ The following represents the complete object graph managed by Koin after migrati
 | ExposedRefreshTokenRepository | RefreshTokenRepository | — | auth |
 | GetDrivers | — | DriverCache, DriverDataSource, JolpicaConfig.cacheTtlHours | drivers |
 
-### Factories (new instance per injection)
+### Use Cases (singletons — stateless, injected via lazy delegates at Route scope)
 
 | Component | Dependencies | Module |
 |-----------|--------------|--------|
