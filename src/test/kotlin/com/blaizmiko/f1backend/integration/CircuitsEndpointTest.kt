@@ -1,11 +1,11 @@
 package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.CircuitsResponse
+import com.blaizmiko.f1backend.adapter.port.CircuitCache
 import com.blaizmiko.f1backend.adapter.route.circuitRoutes
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.Circuit
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
-import com.blaizmiko.f1backend.domain.port.CircuitCache
 import com.blaizmiko.f1backend.domain.port.CircuitDataSource
 import com.blaizmiko.f1backend.infrastructure.cache.InMemoryCircuitCache
 import com.blaizmiko.f1backend.usecase.GetCircuits

@@ -1,9 +1,9 @@
 package com.blaizmiko.f1backend.usecase
 
+import com.blaizmiko.f1backend.adapter.port.CircuitCache
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.Circuit
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
-import com.blaizmiko.f1backend.domain.port.CircuitCache
 import com.blaizmiko.f1backend.domain.port.CircuitDataSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex

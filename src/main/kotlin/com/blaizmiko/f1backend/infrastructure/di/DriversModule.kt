@@ -1,6 +1,6 @@
 package com.blaizmiko.f1backend.infrastructure.di
 
-import com.blaizmiko.f1backend.domain.port.DriverCache
+import com.blaizmiko.f1backend.adapter.port.DriverCache
 import com.blaizmiko.f1backend.infrastructure.cache.InMemoryDriverCache
 import com.blaizmiko.f1backend.infrastructure.config.JolpicaConfig
 import com.blaizmiko.f1backend.usecase.GetDrivers

@@ -2,12 +2,12 @@ package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.DriversResponse
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
+import com.blaizmiko.f1backend.adapter.port.DriverCache
 import com.blaizmiko.f1backend.adapter.route.driverRoutes
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.Driver
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.SeasonCache
-import com.blaizmiko.f1backend.domain.port.DriverCache
 import com.blaizmiko.f1backend.domain.port.DriverDataSource
 import com.blaizmiko.f1backend.infrastructure.cache.InMemoryDriverCache
 import com.blaizmiko.f1backend.usecase.GetDrivers

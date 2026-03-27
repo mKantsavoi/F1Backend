@@ -1,10 +1,10 @@
 package com.blaizmiko.f1backend.usecase
 
+import com.blaizmiko.f1backend.adapter.port.TeamCache
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.model.Team
-import com.blaizmiko.f1backend.domain.port.TeamCache
 import com.blaizmiko.f1backend.domain.port.TeamDataSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex

@@ -1,9 +1,9 @@
 package com.blaizmiko.f1backend.infrastructure.cache
 
+import com.blaizmiko.f1backend.adapter.port.DriverCache
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.Driver
 import com.blaizmiko.f1backend.domain.model.SeasonCache
-import com.blaizmiko.f1backend.domain.port.DriverCache
 import java.util.concurrent.ConcurrentHashMap
 
 class InMemoryDriverCache : DriverCache {

@@ -1,9 +1,9 @@
 package com.blaizmiko.f1backend.infrastructure.cache
 
+import com.blaizmiko.f1backend.adapter.port.TeamCache
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.model.Team
-import com.blaizmiko.f1backend.domain.port.TeamCache
 import java.util.concurrent.ConcurrentHashMap
 
 class InMemoryTeamCache : TeamCache {

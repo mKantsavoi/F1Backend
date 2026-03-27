@@ -1,12 +1,12 @@
 package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.TeamsResponse
+import com.blaizmiko.f1backend.adapter.port.TeamCache
 import com.blaizmiko.f1backend.adapter.route.teamRoutes
 import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.model.Team
-import com.blaizmiko.f1backend.domain.port.TeamCache
 import com.blaizmiko.f1backend.domain.port.TeamDataSource
 import com.blaizmiko.f1backend.infrastructure.cache.InMemoryTeamCache
 import com.blaizmiko.f1backend.usecase.GetTeams
