@@ -8,8 +8,9 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 
 // External HTTP clients. Add new API client bindings here (e.g., teams API, telemetry API).
-val clientModule = module {
-    single { JolpicaClient(get()) } bind DriverDataSource::class withOptions {
-        onClose { (it as? JolpicaClient)?.close() }
+val clientModule =
+    module {
+        single { JolpicaClient(get()) } bind DriverDataSource::class withOptions {
+            onClose { (it as? JolpicaClient)?.close() }
+        }
     }
-}

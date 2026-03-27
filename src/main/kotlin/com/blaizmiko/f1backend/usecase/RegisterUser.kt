@@ -1,6 +1,9 @@
 package com.blaizmiko.f1backend.usecase
 
 import com.blaizmiko.f1backend.domain.model.ConflictException
+import com.blaizmiko.f1backend.domain.model.MAX_USERNAME_LENGTH
+import com.blaizmiko.f1backend.domain.model.MIN_PASSWORD_LENGTH
+import com.blaizmiko.f1backend.domain.model.MIN_USERNAME_LENGTH
 import com.blaizmiko.f1backend.domain.model.ValidationException
 import com.blaizmiko.f1backend.domain.repository.RefreshTokenRepository
 import com.blaizmiko.f1backend.domain.repository.UserRepository
@@ -10,7 +13,11 @@ import com.blaizmiko.f1backend.infrastructure.security.PasswordHasher
 import com.blaizmiko.f1backend.infrastructure.security.TokenHasher
 import java.time.Instant
 
-data class TokenPair(val accessToken: String, val refreshToken: String, val expiresIn: Long)
+data class TokenPair(
+    val accessToken: String,
+    val refreshToken: String,
+    val expiresIn: Long,
+)
 
 class RegisterUser(
     private val userRepository: UserRepository,
@@ -18,7 +25,11 @@ class RegisterUser(
     private val jwtProvider: JwtProvider,
     private val jwtConfig: JwtConfig,
 ) {
-    suspend fun execute(email: String, username: String, password: String): TokenPair {
+    suspend fun execute(
+        email: String,
+        username: String,
+        password: String,
+    ): TokenPair {
         validateEmail(email)
         validateUsername(username)
         validatePassword(password)
@@ -47,8 +58,10 @@ class RegisterUser(
     }
 
     private fun validateUsername(username: String) {
-        if (username.length < 3 || username.length > 30) {
-            throw ValidationException("Username must be between 3 and 30 characters")
+        if (username.length < MIN_USERNAME_LENGTH || username.length > MAX_USERNAME_LENGTH) {
+            throw ValidationException(
+                "Username must be between $MIN_USERNAME_LENGTH and $MAX_USERNAME_LENGTH characters",
+            )
         }
         if (!username.matches(Regex("^[a-zA-Z0-9_-]+$"))) {
             throw ValidationException("Username can only contain Latin letters, digits, hyphens, and underscores")
@@ -59,8 +72,8 @@ class RegisterUser(
     }
 
     private fun validatePassword(password: String) {
-        if (password.length < 8) {
-            throw ValidationException("Password must be at least 8 characters")
+        if (password.length < MIN_PASSWORD_LENGTH) {
+            throw ValidationException("Password must be at least $MIN_PASSWORD_LENGTH characters")
         }
         if (!password.any { it.isLetter() }) {
             throw ValidationException("Password must contain at least one letter")

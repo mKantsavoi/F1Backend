@@ -6,10 +6,11 @@ import org.koin.dsl.module
 
 // Core infrastructure: application configuration and security.
 // Add shared cross-cutting concerns here (e.g., logging, metrics).
-fun coreModule(appConfig: AppConfig) = module {
-    single { appConfig }
-    single { appConfig.jwt }
-    single { appConfig.jolpica }
-    single { appConfig.database }
-    single { JwtProvider(get()) }
-}
+fun coreModule(appConfig: AppConfig) =
+    module {
+        single { appConfig }
+        single { appConfig.jwt }
+        single { appConfig.jolpica }
+        single { appConfig.database }
+        single { JwtProvider(get()) }
+    }

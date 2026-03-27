@@ -22,79 +22,87 @@ class GetDrivers(
     private val dataSource: DriverDataSource,
     private val cacheTtlHours: Long,
 ) {
+    companion object {
+        private const val RETRY_THROTTLE_SECONDS = 60L
+        private const val SECONDS_PER_HOUR = 3600L
+    }
+
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
     private val resolvedSeasons = ConcurrentHashMap<String, String>()
     private val lastFailedAttempt = ConcurrentHashMap<String, Instant>()
 
     suspend fun execute(season: String = "current"): DriversResult {
-        // Fast path: serve from fresh cache without acquiring mutex
         val quickCached = cache.get(season)
         if (quickCached != null && quickCached.isFresh()) {
-            return DriversResult(
-                season = resolvedSeasons[season] ?: season,
-                drivers = quickCached.data,
-                isStale = false,
-            )
+            return freshResult(season, quickCached.data)
         }
 
         val mutex = fetchMutexes.getOrPut(season) { Mutex() }
+        return mutex.withLock { fetchOrServeCached(season) }
+    }
 
-        return mutex.withLock {
-            // Re-check after acquiring lock (another coroutine may have refreshed)
-            val cached = cache.get(season)
+    private suspend fun fetchOrServeCached(season: String): DriversResult {
+        val cached = cache.get(season)
 
-            if (cached != null && cached.isFresh()) {
-                return@withLock DriversResult(
-                    season = resolvedSeasons[season] ?: season,
-                    drivers = cached.data,
-                    isStale = false,
-                )
-            }
+        return when {
+            cached != null && cached.isFresh() -> freshResult(season, cached.data)
+            isThrottled(season) -> staleOrThrow(season, cached)
+            else -> tryFetch(season, cached)
+        }
+    }
 
-            // Skip fetch if we failed recently (throttle for 60s)
-            val lastFailed = lastFailedAttempt[season]
-            if (lastFailed != null && Instant.now().isBefore(lastFailed.plusSeconds(60))) {
-                if (cached != null) {
-                    return@withLock DriversResult(
-                        season = resolvedSeasons[season] ?: season,
-                        drivers = cached.data,
-                        isStale = true,
-                    )
-                } else {
-                    throw ExternalServiceException("Unable to fetch driver data. Please try again later.")
-                }
-            }
+    private fun isThrottled(season: String): Boolean {
+        val lastFailed = lastFailedAttempt[season] ?: return false
+        return Instant.now().isBefore(lastFailed.plusSeconds(RETRY_THROTTLE_SECONDS))
+    }
 
-            try {
-                val (resolvedSeason, drivers) = dataSource.fetchDrivers(season)
-                val now = Instant.now()
-                val entry = CacheEntry(
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun tryFetch(
+        season: String,
+        cached: CacheEntry<List<Driver>>?,
+    ): DriversResult =
+        try {
+            val (resolvedSeason, drivers) = dataSource.fetchDrivers(season)
+            val now = Instant.now()
+            val entry =
+                CacheEntry(
                     data = drivers,
                     fetchedAt = now,
-                    expiresAt = now.plusSeconds(cacheTtlHours * 3600),
+                    expiresAt = now.plusSeconds(cacheTtlHours * SECONDS_PER_HOUR),
                 )
-                cache.put(season, entry)
-                resolvedSeasons[season] = resolvedSeason
-                lastFailedAttempt.remove(season)
+            cache.put(season, entry)
+            resolvedSeasons[season] = resolvedSeason
+            lastFailedAttempt.remove(season)
 
-                DriversResult(
-                    season = resolvedSeason,
-                    drivers = drivers,
-                    isStale = false,
-                )
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                lastFailedAttempt[season] = Instant.now()
-                if (cached != null) {
-                    DriversResult(
-                        season = resolvedSeasons[season] ?: season,
-                        drivers = cached.data,
-                        isStale = true,
-                    )
-                } else {
-                    throw ExternalServiceException("Unable to fetch driver data. Please try again later.")
-                }
-            }
+            DriversResult(season = resolvedSeason, drivers = drivers, isStale = false)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            lastFailedAttempt[season] = Instant.now()
+            staleOrThrow(season, cached)
         }
+
+    private fun freshResult(
+        season: String,
+        drivers: List<Driver>,
+    ): DriversResult =
+        DriversResult(
+            season = resolvedSeasons[season] ?: season,
+            drivers = drivers,
+            isStale = false,
+        )
+
+    private fun staleOrThrow(
+        season: String,
+        cached: CacheEntry<List<Driver>>?,
+    ): DriversResult {
+        if (cached != null) {
+            return DriversResult(
+                season = resolvedSeasons[season] ?: season,
+                drivers = cached.data,
+                isStale = true,
+            )
+        }
+        throw ExternalServiceException("Unable to fetch driver data. Please try again later.")
     }
 }

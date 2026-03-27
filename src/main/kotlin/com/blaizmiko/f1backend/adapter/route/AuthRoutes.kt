@@ -1,13 +1,32 @@
 package com.blaizmiko.f1backend.adapter.route
 
-import com.blaizmiko.f1backend.adapter.dto.*
-import com.blaizmiko.f1backend.usecase.*
-import io.ktor.http.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import com.blaizmiko.f1backend.adapter.dto.ChangePasswordRequest
+import com.blaizmiko.f1backend.adapter.dto.LoginRequest
+import com.blaizmiko.f1backend.adapter.dto.LogoutRequest
+import com.blaizmiko.f1backend.adapter.dto.MessageResponse
+import com.blaizmiko.f1backend.adapter.dto.ProfileResponse
+import com.blaizmiko.f1backend.adapter.dto.RefreshRequest
+import com.blaizmiko.f1backend.adapter.dto.RegisterRequest
+import com.blaizmiko.f1backend.adapter.dto.TokenResponse
+import com.blaizmiko.f1backend.adapter.dto.UpdateProfileRequest
+import com.blaizmiko.f1backend.usecase.ChangePassword
+import com.blaizmiko.f1backend.usecase.GetProfile
+import com.blaizmiko.f1backend.usecase.LoginUser
+import com.blaizmiko.f1backend.usecase.LogoutUser
+import com.blaizmiko.f1backend.usecase.RefreshTokens
+import com.blaizmiko.f1backend.usecase.RegisterUser
+import com.blaizmiko.f1backend.usecase.UpdateProfile
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.patch
+import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import org.koin.ktor.ext.inject
 import java.util.UUID
 
@@ -51,13 +70,15 @@ fun Route.authRoutes() {
             val principal = call.principal<JWTPrincipal>()!!
             val userId = UUID.fromString(principal.subject)
             val user = getProfile.execute(userId)
-            call.respond(ProfileResponse(
-                id = user.id.toString(),
-                email = user.email,
-                username = user.username,
-                role = user.role.name.lowercase(),
-                createdAt = user.createdAt.toString(),
-            ))
+            call.respond(
+                ProfileResponse(
+                    id = user.id.toString(),
+                    email = user.email,
+                    username = user.username,
+                    role = user.role.name.lowercase(),
+                    createdAt = user.createdAt.toString(),
+                ),
+            )
         }
 
         patch("/me") {
@@ -65,13 +86,15 @@ fun Route.authRoutes() {
             val userId = UUID.fromString(principal.subject)
             val request = call.receive<UpdateProfileRequest>()
             val user = updateProfile.execute(userId, request.username)
-            call.respond(ProfileResponse(
-                id = user.id.toString(),
-                email = user.email,
-                username = user.username,
-                role = user.role.name.lowercase(),
-                createdAt = user.createdAt.toString(),
-            ))
+            call.respond(
+                ProfileResponse(
+                    id = user.id.toString(),
+                    email = user.email,
+                    username = user.username,
+                    role = user.role.name.lowercase(),
+                    createdAt = user.createdAt.toString(),
+                ),
+            )
         }
 
         put("/me/password") {

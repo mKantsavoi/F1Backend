@@ -5,5 +5,9 @@ import com.blaizmiko.f1backend.domain.model.Driver
 
 interface DriverCache {
     fun get(season: String): CacheEntry<List<Driver>>?
-    fun put(season: String, entry: CacheEntry<List<Driver>>)
+
+    fun put(
+        season: String,
+        entry: CacheEntry<List<Driver>>,
+    )
 }

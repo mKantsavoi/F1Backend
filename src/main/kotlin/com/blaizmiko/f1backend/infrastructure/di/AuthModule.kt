@@ -16,15 +16,16 @@ import org.koin.dsl.module
 
 // Authentication feature: repositories and use cases.
 // Add new auth-related components here (e.g., OAuth providers, MFA service).
-val authModule = module {
-    single { ExposedUserRepository() } bind UserRepository::class
-    single { ExposedRefreshTokenRepository() } bind RefreshTokenRepository::class
+val authModule =
+    module {
+        single { ExposedUserRepository() } bind UserRepository::class
+        single { ExposedRefreshTokenRepository() } bind RefreshTokenRepository::class
 
-    single { RegisterUser(get(), get(), get(), get()) }
-    single { LoginUser(get(), get(), get(), get()) }
-    single { RefreshTokens(get(), get(), get(), get()) }
-    single { GetProfile(get()) }
-    single { UpdateProfile(get()) }
-    single { ChangePassword(get()) }
-    single { LogoutUser(get()) }
-}
+        single { RegisterUser(get(), get(), get(), get()) }
+        single { LoginUser(get(), get(), get(), get()) }
+        single { RefreshTokens(get(), get(), get(), get()) }
+        single { GetProfile(get()) }
+        single { UpdateProfile(get()) }
+        single { ChangePassword(get()) }
+        single { LogoutUser(get()) }
+    }
