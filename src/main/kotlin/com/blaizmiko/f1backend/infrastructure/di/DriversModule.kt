@@ -9,7 +9,8 @@ import org.koin.dsl.module
 
 // Drivers feature: cache and use cases.
 // Add new driver-related components here (e.g., driver details, standings).
-val driversModule = module {
-    single { InMemoryDriverCache() } bind DriverCache::class
-    single { GetDrivers(get(), get(), get<JolpicaConfig>().cacheTtlHours) }
-}
+val driversModule =
+    module {
+        single { InMemoryDriverCache() } bind DriverCache::class
+        single { GetDrivers(get(), get(), get<JolpicaConfig>().cacheTtlHours) }
+    }

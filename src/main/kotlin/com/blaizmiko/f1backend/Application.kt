@@ -7,14 +7,16 @@ import com.blaizmiko.f1backend.infrastructure.di.coreModule
 import com.blaizmiko.f1backend.infrastructure.di.driversModule
 import com.blaizmiko.f1backend.infrastructure.persistence.DatabaseFactory
 import com.blaizmiko.f1backend.infrastructure.security.JwtProvider
-import io.ktor.server.application.*
-import io.ktor.server.auth.*
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.auth.Authentication
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 
 fun main(args: Array<String>) {
-    io.ktor.server.netty.EngineMain.main(args)
+    io.ktor.server.netty.EngineMain
+        .main(args)
 }
 
 fun Application.module() {

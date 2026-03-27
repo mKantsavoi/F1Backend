@@ -16,8 +16,9 @@ class RefreshTokens(
 ) {
     suspend fun execute(rawRefreshToken: String): TokenPair {
         val tokenHash = TokenHasher.hashToken(rawRefreshToken)
-        val storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
-            ?: throw AuthenticationException("Refresh token is invalid or has been revoked")
+        val storedToken =
+            refreshTokenRepository.findByTokenHash(tokenHash)
+                ?: throw AuthenticationException("Refresh token is invalid or has been revoked")
 
         // Reuse detection: if the token was already revoked (rotated), revoke ALL tokens for the user
         if (storedToken.revoked) {
@@ -32,8 +33,9 @@ class RefreshTokens(
         // Revoke the old token (rotation)
         refreshTokenRepository.revokeByTokenHash(tokenHash)
 
-        val user = userRepository.findById(storedToken.userId)
-            ?: throw AuthenticationException("Refresh token is invalid or has been revoked")
+        val user =
+            userRepository.findById(storedToken.userId)
+                ?: throw AuthenticationException("Refresh token is invalid or has been revoked")
 
         // Issue new token pair
         val newRawRefreshToken = TokenHasher.generateToken()

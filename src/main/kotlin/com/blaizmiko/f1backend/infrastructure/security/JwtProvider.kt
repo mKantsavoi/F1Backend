@@ -4,33 +4,45 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
 import com.blaizmiko.f1backend.infrastructure.config.JwtConfig
-import io.ktor.http.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
-import io.ktor.server.response.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.auth.AuthenticationConfig
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.jwt.jwt
+import io.ktor.server.response.respond
 import java.util.Date
 import java.util.UUID
 
-class JwtProvider(private val config: JwtConfig) {
+class JwtProvider(
+    private val config: JwtConfig,
+) {
     private val algorithm = Algorithm.HMAC256(config.secret)
 
-    fun generateAccessToken(userId: UUID, role: String): String =
-        JWT.create()
+    companion object {
+        private const val MILLIS_PER_SECOND = 1000L
+    }
+
+    fun generateAccessToken(
+        userId: UUID,
+        role: String,
+    ): String =
+        JWT
+            .create()
             .withSubject(userId.toString())
             .withIssuer(config.issuer)
             .withAudience(config.audience)
             .withClaim("role", role)
             .withIssuedAt(Date())
-            .withExpiresAt(Date(System.currentTimeMillis() + config.accessTokenExpirySeconds * 1000))
+            .withExpiresAt(Date(System.currentTimeMillis() + config.accessTokenExpirySeconds * MILLIS_PER_SECOND))
             .sign(algorithm)
 
     fun configureAuth(authConfig: AuthenticationConfig) {
         authConfig.jwt {
             verifier(
-                JWT.require(algorithm)
+                JWT
+                    .require(algorithm)
                     .withIssuer(this@JwtProvider.config.issuer)
                     .withAudience(this@JwtProvider.config.audience)
-                    .build()
+                    .build(),
             )
             validate { credential ->
                 if (credential.payload.subject != null) {
@@ -42,7 +54,7 @@ class JwtProvider(private val config: JwtConfig) {
             challenge { _, _ ->
                 call.respond(
                     HttpStatusCode.Unauthorized,
-                    ErrorResponse("unauthorized", "Token is invalid or has expired")
+                    ErrorResponse("unauthorized", "Token is invalid or has expired"),
                 )
             }
         }

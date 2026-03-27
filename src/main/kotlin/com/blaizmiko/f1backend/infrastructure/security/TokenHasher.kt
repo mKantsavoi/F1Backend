@@ -5,10 +5,11 @@ import java.security.SecureRandom
 import java.util.Base64
 
 object TokenHasher {
+    private const val TOKEN_BYTE_LENGTH = 32
     private val secureRandom = SecureRandom()
 
     fun generateToken(): String {
-        val bytes = ByteArray(32)
+        val bytes = ByteArray(TOKEN_BYTE_LENGTH)
         secureRandom.nextBytes(bytes)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }

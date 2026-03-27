@@ -13,21 +13,23 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 object DatabaseFactory {
     fun init(config: DatabaseConfig) {
-        val dataSource = HikariDataSource(HikariConfig().apply {
-            jdbcUrl = config.url
-            username = config.user
-            password = config.password
-            maximumPoolSize = 10
-            isAutoCommit = false
-            transactionIsolation = "TRANSACTION_REPEATABLE_READ"
-            validate()
-        })
+        val dataSource =
+            HikariDataSource(
+                HikariConfig().apply {
+                    jdbcUrl = config.url
+                    username = config.user
+                    password = config.password
+                    maximumPoolSize = config.maxPoolSize
+                    isAutoCommit = false
+                    transactionIsolation = "TRANSACTION_REPEATABLE_READ"
+                    validate()
+                },
+            )
         Database.connect(dataSource)
         transaction {
             SchemaUtils.create(UsersTable, RefreshTokensTable)
         }
     }
 
-    suspend fun <T> dbQuery(block: suspend () -> T): T =
-        newSuspendedTransaction(Dispatchers.IO) { block() }
+    suspend fun <T> dbQuery(block: suspend () -> T): T = newSuspendedTransaction(Dispatchers.IO) { block() }
 }

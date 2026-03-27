@@ -15,9 +15,13 @@ class LoginUser(
     private val jwtProvider: JwtProvider,
     private val jwtConfig: JwtConfig,
 ) {
-    suspend fun execute(email: String, password: String): TokenPair {
-        val user = userRepository.findByEmail(email)
-            ?: throw AuthenticationException("Invalid email or password")
+    suspend fun execute(
+        email: String,
+        password: String,
+    ): TokenPair {
+        val user =
+            userRepository.findByEmail(email)
+                ?: throw AuthenticationException("Invalid email or password")
 
         if (!PasswordHasher.verify(password, user.passwordHash)) {
             throw AuthenticationException("Invalid email or password")

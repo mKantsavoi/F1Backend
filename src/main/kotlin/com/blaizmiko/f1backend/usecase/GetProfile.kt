@@ -5,9 +5,10 @@ import com.blaizmiko.f1backend.domain.model.User
 import com.blaizmiko.f1backend.domain.repository.UserRepository
 import java.util.UUID
 
-class GetProfile(private val userRepository: UserRepository) {
-    suspend fun execute(userId: UUID): User {
-        return userRepository.findById(userId)
+class GetProfile(
+    private val userRepository: UserRepository,
+) {
+    suspend fun execute(userId: UUID): User =
+        userRepository.findById(userId)
             ?: throw AuthenticationException("User not found")
-    }
 }

@@ -3,9 +3,12 @@ package com.blaizmiko.f1backend.infrastructure.security
 import at.favre.lib.crypto.bcrypt.BCrypt
 
 object PasswordHasher {
-    fun hash(password: String): String =
-        BCrypt.withDefaults().hashToString(12, password.toCharArray())
+    private const val BCRYPT_COST = 12
 
-    fun verify(password: String, hash: String): Boolean =
-        BCrypt.verifyer().verify(password.toCharArray(), hash).verified
+    fun hash(password: String): String = BCrypt.withDefaults().hashToString(BCRYPT_COST, password.toCharArray())
+
+    fun verify(
+        password: String,
+        hash: String,
+    ): Boolean = BCrypt.verifyer().verify(password.toCharArray(), hash).verified
 }
