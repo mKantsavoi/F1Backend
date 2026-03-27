@@ -1,16 +1,14 @@
 package com.blaizmiko.f1backend.integration
 
-import com.blaizmiko.f1backend.adapter.dto.DriversResponse
-import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
-import com.blaizmiko.f1backend.adapter.port.DriverCache
-import com.blaizmiko.f1backend.adapter.route.driverRoutes
+import com.blaizmiko.f1backend.adapter.dto.CircuitsResponse
+import com.blaizmiko.f1backend.adapter.port.CircuitCache
+import com.blaizmiko.f1backend.adapter.route.circuitRoutes
 import com.blaizmiko.f1backend.domain.model.CacheEntry
-import com.blaizmiko.f1backend.domain.model.Driver
+import com.blaizmiko.f1backend.domain.model.Circuit
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
-import com.blaizmiko.f1backend.domain.model.SeasonCache
-import com.blaizmiko.f1backend.domain.port.DriverDataSource
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryDriverCache
-import com.blaizmiko.f1backend.usecase.GetDrivers
+import com.blaizmiko.f1backend.domain.port.CircuitDataSource
+import com.blaizmiko.f1backend.infrastructure.cache.InMemoryCircuitCache
+import com.blaizmiko.f1backend.usecase.GetCircuits
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -35,45 +33,55 @@ import io.ktor.server.testing.testApplication
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
 import java.time.Instant
-import java.time.LocalDate
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse as Err
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
-class DriversEndpointTest :
+class CircuitsEndpointTest :
     StringSpec({
 
-        val sampleDrivers =
+        val sampleCircuits =
             listOf(
-                Driver("max_verstappen", 1, "VER", "Max", "Verstappen", "Dutch", LocalDate.of(1997, 9, 30)),
-                Driver("hamilton", 44, "HAM", "Lewis", "Hamilton", "British", LocalDate.of(1985, 1, 7)),
+                Circuit(
+                    "monza",
+                    "Autodromo Nazionale di Monza",
+                    "Monza",
+                    "Italy",
+                    45.6156,
+                    9.2811,
+                    "https://en.wikipedia.org/wiki/Monza_Circuit",
+                ),
+                Circuit(
+                    "silverstone",
+                    "Silverstone Circuit",
+                    "Silverstone",
+                    "UK",
+                    52.0786,
+                    -1.0169,
+                    "https://en.wikipedia.org/wiki/Silverstone_Circuit",
+                ),
             )
 
-        class FakeDataSource(
-            private var drivers: List<Driver> = emptyList(),
-            private var season: String = "2026",
+        class FakeCircuitDataSource(
+            private var circuits: List<Circuit> = emptyList(),
             var shouldFail: Boolean = false,
             var callCount: Int = 0,
-        ) : DriverDataSource {
-            override suspend fun fetchDrivers(season: String): Pair<String, List<Driver>> {
+        ) : CircuitDataSource {
+            override suspend fun fetchCircuits(): List<Circuit> {
                 callCount++
                 if (shouldFail) throw ExternalServiceException("Jolpica unavailable")
-                return this.season to drivers
+                return circuits
             }
         }
 
-        fun driversTestApp(
-            dataSource: DriverDataSource,
-            cache: DriverCache = InMemoryDriverCache(),
-            cacheTtlHours: Long = 24,
+        fun circuitsTestApp(
+            dataSource: CircuitDataSource,
+            cache: CircuitCache = InMemoryCircuitCache(),
             block: suspend ApplicationTestBuilder.() -> Unit,
         ) = testApplication {
             install(ServerContentNegotiation) {
                 json()
             }
             install(StatusPages) {
-                exception<com.blaizmiko.f1backend.domain.model.ValidationException> { call, cause ->
-                    call.respond(HttpStatusCode.BadRequest, Err("validation_error", cause.message))
-                }
                 exception<ExternalServiceException> { call, cause ->
                     call.respond(HttpStatusCode.BadGateway, Err("external_service_unavailable", cause.message))
                 }
@@ -99,12 +107,12 @@ class DriversEndpointTest :
                 }
             }
 
-            val getDrivers = GetDrivers(cache, dataSource, cacheTtlHours)
+            val getCircuits = GetCircuits(cache, dataSource)
 
             install(Koin) {
                 modules(
                     module {
-                        single { getDrivers }
+                        single { getCircuits }
                     },
                 )
             }
@@ -112,7 +120,7 @@ class DriversEndpointTest :
             routing {
                 authenticate {
                     route("/api/v1") {
-                        driverRoutes()
+                        circuitRoutes()
                     }
                 }
             }
@@ -133,128 +141,95 @@ class DriversEndpointTest :
                         .HMAC256("test-secret-that-is-at-least-256-bits-long-for-hmac"),
                 )
 
-        "happy path: returns current season drivers" {
-            val dataSource = FakeDataSource(drivers = sampleDrivers, season = "2026")
-            driversTestApp(dataSource) {
+        "happy path: returns all circuits" {
+            val dataSource = FakeCircuitDataSource(circuits = sampleCircuits)
+            circuitsTestApp(dataSource) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 
                 val response =
-                    client.get("/api/v1/drivers") {
+                    client.get("/api/v1/circuits") {
                         bearerAuth(token)
                     }
 
                 response.status shouldBe HttpStatusCode.OK
-                val body = response.body<DriversResponse>()
-                body.season shouldBe "2026"
-                body.drivers shouldHaveSize 2
-                body.drivers[0].id shouldBe "max_verstappen"
-                body.drivers[0].number shouldBe 1
-                body.drivers[0].code shouldBe "VER"
-                body.drivers[0].firstName shouldBe "Max"
-                body.drivers[0].lastName shouldBe "Verstappen"
-                body.drivers[0].nationality shouldBe "Dutch"
-                body.drivers[0].dateOfBirth shouldBe "1997-09-30"
+                val body = response.body<CircuitsResponse>()
+                body.circuits shouldHaveSize 2
+                body.circuits[0].circuitId shouldBe "monza"
+                body.circuits[0].name shouldBe "Autodromo Nazionale di Monza"
+                body.circuits[0].locality shouldBe "Monza"
+                body.circuits[0].country shouldBe "Italy"
+                body.circuits[0].lat shouldBe 45.6156
+                body.circuits[0].lng shouldBe 9.2811
+                body.circuits[0].url shouldBe "https://en.wikipedia.org/wiki/Monza_Circuit"
                 response.headers[HttpHeaders.Warning] shouldBe null
             }
         }
 
         "401 without token" {
-            val dataSource = FakeDataSource(drivers = sampleDrivers)
-            driversTestApp(dataSource) {
+            val dataSource = FakeCircuitDataSource(circuits = sampleCircuits)
+            circuitsTestApp(dataSource) {
                 val client = createClient { install(ContentNegotiation) { json() } }
 
-                val response = client.get("/api/v1/drivers")
+                val response = client.get("/api/v1/circuits")
                 response.status shouldBe HttpStatusCode.Unauthorized
             }
         }
 
         "cache hit: second request does not call data source" {
-            val dataSource = FakeDataSource(drivers = sampleDrivers, season = "2026")
-            driversTestApp(dataSource) {
+            val dataSource = FakeCircuitDataSource(circuits = sampleCircuits)
+            circuitsTestApp(dataSource) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 
-                // First request — fetches from source
-                client.get("/api/v1/drivers") { bearerAuth(token) }
+                client.get("/api/v1/circuits") { bearerAuth(token) }
                 dataSource.callCount shouldBe 1
 
-                // Second request — served from cache
-                val response = client.get("/api/v1/drivers") { bearerAuth(token) }
+                val response = client.get("/api/v1/circuits") { bearerAuth(token) }
                 response.status shouldBe HttpStatusCode.OK
                 dataSource.callCount shouldBe 1
 
-                // Cached response should return resolved season, not "current"
-                val body = response.body<DriversResponse>()
-                body.season shouldBe "2026"
+                val body = response.body<CircuitsResponse>()
+                body.circuits shouldHaveSize 2
             }
         }
 
         "stale cache fallback: returns data with Warning header when source fails" {
-            val dataSource = FakeDataSource(drivers = sampleDrivers, season = "2026")
-            val cache = InMemoryDriverCache()
+            val dataSource = FakeCircuitDataSource(circuits = sampleCircuits)
+            val cache = InMemoryCircuitCache()
 
-            // Pre-populate cache with stale data
             cache.put(
-                "current",
                 CacheEntry(
-                    data = SeasonCache("2026", sampleDrivers),
+                    data = sampleCircuits,
                     fetchedAt = Instant.now().minusSeconds(90_000),
                     expiresAt = Instant.now().minusSeconds(3_600),
                 ),
             )
             dataSource.shouldFail = true
 
-            driversTestApp(dataSource, cache) {
+            circuitsTestApp(dataSource, cache) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 
-                val response = client.get("/api/v1/drivers") { bearerAuth(token) }
+                val response = client.get("/api/v1/circuits") { bearerAuth(token) }
                 response.status shouldBe HttpStatusCode.OK
                 response.headers[HttpHeaders.Warning] shouldBe """110 - "Response is stale""""
 
-                val body = response.body<DriversResponse>()
-                body.drivers shouldHaveSize 2
+                val body = response.body<CircuitsResponse>()
+                body.circuits shouldHaveSize 2
             }
         }
 
         "502 when source fails and no cache exists" {
-            val dataSource = FakeDataSource(shouldFail = true)
-            driversTestApp(dataSource) {
+            val dataSource = FakeCircuitDataSource(shouldFail = true)
+            circuitsTestApp(dataSource) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 
-                val response = client.get("/api/v1/drivers") { bearerAuth(token) }
+                val response = client.get("/api/v1/circuits") { bearerAuth(token) }
                 response.status shouldBe HttpStatusCode.BadGateway
-                val body = response.body<ErrorResponse>()
+                val body = response.body<Err>()
                 body.error shouldBe "external_service_unavailable"
-            }
-        }
-
-        "season parameter: valid year returns drivers for that season" {
-            val dataSource = FakeDataSource(drivers = sampleDrivers, season = "2024")
-            driversTestApp(dataSource) {
-                val client = createClient { install(ContentNegotiation) { json() } }
-                val token = generateToken()
-
-                val response = client.get("/api/v1/drivers?season=2024") { bearerAuth(token) }
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<DriversResponse>()
-                body.season shouldBe "2024"
-            }
-        }
-
-        "season parameter: invalid value returns 400" {
-            val dataSource = FakeDataSource()
-            driversTestApp(dataSource) {
-                val client = createClient { install(ContentNegotiation) { json() } }
-                val token = generateToken()
-
-                val response = client.get("/api/v1/drivers?season=abc") { bearerAuth(token) }
-                response.status shouldBe HttpStatusCode.BadRequest
-
-                val response2 = client.get("/api/v1/drivers?season=1800") { bearerAuth(token) }
-                response2.status shouldBe HttpStatusCode.BadRequest
             }
         }
     })

@@ -30,3 +30,60 @@ data class JolpicaDriver(
     val nationality: String = "",
     val url: String = "",
 )
+
+// Constructor (team) models
+@Serializable
+data class JolpicaConstructorResponse(
+    @SerialName("MRData") val mrData: ConstructorMRData,
+)
+
+@Serializable
+data class ConstructorMRData(
+    @SerialName("ConstructorTable") val constructorTable: ConstructorTable,
+)
+
+@Serializable
+data class ConstructorTable(
+    val season: String,
+    @SerialName("Constructors") val constructors: List<JolpicaConstructor>,
+)
+
+@Serializable
+data class JolpicaConstructor(
+    val constructorId: String,
+    val name: String,
+    val nationality: String = "",
+    val url: String = "",
+)
+
+// Circuit models
+@Serializable
+data class JolpicaCircuitResponse(
+    @SerialName("MRData") val mrData: CircuitMRData,
+)
+
+@Serializable
+data class CircuitMRData(
+    @SerialName("CircuitTable") val circuitTable: CircuitTable,
+)
+
+@Serializable
+data class CircuitTable(
+    @SerialName("Circuits") val circuits: List<JolpicaCircuit>,
+)
+
+@Serializable
+data class JolpicaCircuit(
+    val circuitId: String,
+    val circuitName: String,
+    val url: String = "",
+    @SerialName("Location") val location: JolpicaLocation,
+)
+
+@Serializable
+data class JolpicaLocation(
+    val lat: String,
+    val long: String,
+    val locality: String = "",
+    val country: String = "",
+)

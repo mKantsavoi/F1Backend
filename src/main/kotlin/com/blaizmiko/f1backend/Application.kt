@@ -2,9 +2,11 @@ package com.blaizmiko.f1backend
 
 import com.blaizmiko.f1backend.infrastructure.config.loadAppConfig
 import com.blaizmiko.f1backend.infrastructure.di.authModule
+import com.blaizmiko.f1backend.infrastructure.di.circuitsModule
 import com.blaizmiko.f1backend.infrastructure.di.clientModule
 import com.blaizmiko.f1backend.infrastructure.di.coreModule
 import com.blaizmiko.f1backend.infrastructure.di.driversModule
+import com.blaizmiko.f1backend.infrastructure.di.teamsModule
 import com.blaizmiko.f1backend.infrastructure.persistence.DatabaseFactory
 import com.blaizmiko.f1backend.infrastructure.security.JwtProvider
 import io.ktor.server.application.Application
@@ -24,7 +26,7 @@ fun Application.module() {
 
     install(Koin) {
         slf4jLogger()
-        modules(coreModule(appConfig), clientModule, authModule, driversModule)
+        modules(coreModule(appConfig), clientModule, authModule, driversModule, teamsModule, circuitsModule)
     }
 
     DatabaseFactory.init(appConfig.database)

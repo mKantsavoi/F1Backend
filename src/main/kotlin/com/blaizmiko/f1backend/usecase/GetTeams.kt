@@ -1,26 +1,26 @@
 package com.blaizmiko.f1backend.usecase
 
-import com.blaizmiko.f1backend.adapter.port.DriverCache
+import com.blaizmiko.f1backend.adapter.port.TeamCache
 import com.blaizmiko.f1backend.domain.model.CacheEntry
-import com.blaizmiko.f1backend.domain.model.Driver
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.SeasonCache
-import com.blaizmiko.f1backend.domain.port.DriverDataSource
+import com.blaizmiko.f1backend.domain.model.Team
+import com.blaizmiko.f1backend.domain.port.TeamDataSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
-data class DriversResult(
+data class TeamsResult(
     val season: String,
-    val drivers: List<Driver>,
+    val teams: List<Team>,
     val isStale: Boolean,
 )
 
-class GetDrivers(
-    private val cache: DriverCache,
-    private val dataSource: DriverDataSource,
+class GetTeams(
+    private val cache: TeamCache,
+    private val dataSource: TeamDataSource,
     private val cacheTtlHours: Long,
 ) {
     companion object {
@@ -31,7 +31,7 @@ class GetDrivers(
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
     private val lastFailedAttempt = ConcurrentHashMap<String, Instant>()
 
-    suspend fun execute(season: String = "current"): DriversResult {
+    suspend fun execute(season: String = "current"): TeamsResult {
         val quickCached = cache.get(season)
         if (quickCached != null && quickCached.isFresh()) {
             return freshResult(quickCached.data)
@@ -41,7 +41,7 @@ class GetDrivers(
         return mutex.withLock { fetchOrServeCached(season) }
     }
 
-    private suspend fun fetchOrServeCached(season: String): DriversResult {
+    private suspend fun fetchOrServeCached(season: String): TeamsResult {
         val cached = cache.get(season)
 
         return when {
@@ -59,21 +59,21 @@ class GetDrivers(
     @Suppress("TooGenericExceptionCaught")
     private suspend fun tryFetch(
         season: String,
-        cached: CacheEntry<SeasonCache<Driver>>?,
-    ): DriversResult =
+        cached: CacheEntry<SeasonCache<Team>>?,
+    ): TeamsResult =
         try {
-            val (resolvedSeason, drivers) = dataSource.fetchDrivers(season)
+            val (resolvedSeason, teams) = dataSource.fetchTeams(season)
             val now = Instant.now()
             val entry =
                 CacheEntry(
-                    data = SeasonCache(resolvedSeason, drivers),
+                    data = SeasonCache(resolvedSeason, teams),
                     fetchedAt = now,
                     expiresAt = now.plusSeconds(cacheTtlHours * SECONDS_PER_HOUR),
                 )
             cache.put(season, entry)
             lastFailedAttempt.remove(season)
 
-            DriversResult(season = resolvedSeason, drivers = drivers, isStale = false)
+            TeamsResult(season = resolvedSeason, teams = teams, isStale = false)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -81,21 +81,21 @@ class GetDrivers(
             staleOrThrow(cached)
         }
 
-    private fun freshResult(data: SeasonCache<Driver>): DriversResult =
-        DriversResult(
+    private fun freshResult(data: SeasonCache<Team>): TeamsResult =
+        TeamsResult(
             season = data.resolvedSeason,
-            drivers = data.items,
+            teams = data.items,
             isStale = false,
         )
 
-    private fun staleOrThrow(cached: CacheEntry<SeasonCache<Driver>>?): DriversResult {
+    private fun staleOrThrow(cached: CacheEntry<SeasonCache<Team>>?): TeamsResult {
         if (cached != null) {
-            return DriversResult(
+            return TeamsResult(
                 season = cached.data.resolvedSeason,
-                drivers = cached.data.items,
+                teams = cached.data.items,
                 isStale = true,
             )
         }
-        throw ExternalServiceException("Unable to fetch driver data. Please try again later.")
+        throw ExternalServiceException("Unable to fetch team data. Please try again later.")
     }
 }

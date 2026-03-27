@@ -2,7 +2,9 @@ package com.blaizmiko.f1backend
 
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
 import com.blaizmiko.f1backend.adapter.route.authRoutes
+import com.blaizmiko.f1backend.adapter.route.circuitRoutes
 import com.blaizmiko.f1backend.adapter.route.driverRoutes
+import com.blaizmiko.f1backend.adapter.route.teamRoutes
 import com.blaizmiko.f1backend.domain.model.AuthenticationException
 import com.blaizmiko.f1backend.domain.model.ConflictException
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
@@ -56,6 +58,8 @@ fun Application.configureRouting() {
         authenticate {
             route("/api/v1") {
                 driverRoutes()
+                teamRoutes()
+                circuitRoutes()
             }
         }
     }
