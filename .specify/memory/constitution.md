@@ -1,14 +1,14 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.1.0 → 1.2.0 (MINOR: demoted perf standards)
-  Modified principles:
-    - III. Test-First → III. Test Coverage (v1.1.0)
-    - Performance Standards demoted to future goal
-  Added sections: None
+  Version change: 1.2.0 → 1.3.0 (MINOR: new principle added)
+  Modified principles: None
+  Added sections:
+    - VI. Dependency Verification via Context7
   Removed sections: None
   Templates requiring updates:
     - .specify/templates/plan-template.md — ✅ no updates needed
+      (Constitution Check section is generic; picks up new principle)
     - .specify/templates/spec-template.md — ✅ no updates needed
     - .specify/templates/tasks-template.md — ✅ no updates needed
   Follow-up TODOs: None
@@ -95,6 +95,37 @@ Start simple. Every abstraction MUST justify its existence.
 - Every added dependency MUST have a clear, documented
   reason. Avoid transitive dependency bloat.
 
+### VI. Dependency Verification via Context7
+
+Before using or upgrading any third-party library, the
+AI agent MUST query the Context7 MCP server to verify
+the latest stable version and review official documentation
+for correct API usage.
+
+- The agent MUST NOT rely on training data for library
+  versions or API signatures. Context7 MUST be consulted
+  first.
+- This applies to ALL dependencies: Ktor, Exposed,
+  kotlinx-serialization, BCrypt, testcontainers, kotest,
+  and any future additions.
+- When adding a new dependency, the agent MUST:
+  1. Resolve the library ID via Context7
+     (`resolve-library-id`).
+  2. Query the official documentation (`query-docs`) for
+     the specific API surface being used.
+  3. Verify the latest stable version before pinning it
+     in `gradle/libs.versions.toml`.
+- When upgrading an existing dependency, the agent MUST:
+  1. Check Context7 for the current latest stable version.
+  2. Review migration guides or changelog entries for
+     breaking changes between the current and target
+     versions.
+  3. Update all call sites if API signatures have changed.
+- If Context7 is unavailable or returns no results for a
+  library, the agent MUST flag this to the user and await
+  explicit approval before proceeding with training-data
+  assumptions.
+
 ## Technology Stack
 
 The following technology choices are non-negotiable for
@@ -176,4 +207,4 @@ agreements, personal preferences, and ad-hoc practices.
 adherence to these principles. Constitution violations are
 blocking issues.
 
-**Version**: 1.2.0 | **Ratified**: 2026-03-26 | **Last Amended**: 2026-03-26
+**Version**: 1.3.0 | **Ratified**: 2026-03-26 | **Last Amended**: 2026-03-26

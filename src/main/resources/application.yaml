@@ -4,3 +4,15 @@ ktor:
             - com.blaizmiko.ApplicationKt.module
     deployment:
         port: 8080
+
+database:
+    url: ${DB_URL}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+jwt:
+    secret: ${JWT_SECRET}
+    issuer: "f1backend"
+    audience: "f1backend-api"
+    accessTokenExpiry: "900"
+    refreshTokenExpiry: "2592000"

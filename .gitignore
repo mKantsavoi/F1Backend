@@ -48,3 +48,7 @@ out/
 
 # GitHub App credentials
 gha-creds-*.json
+
+### Environment ###
+.env
+.env.*
