@@ -46,6 +46,10 @@ class AuthLifecycleTest : StringSpec({
                 "jwt.audience" to "f1backend-api",
                 "jwt.accessTokenExpiry" to "900",
                 "jwt.refreshTokenExpiry" to "2592000",
+                "jolpica.baseUrl" to "https://api.jolpi.ca/ergast/f1",
+                "jolpica.requestTimeoutMs" to "10000",
+                "jolpica.connectTimeoutMs" to "5000",
+                "jolpica.cacheTtlHours" to "24",
             )
         }
         block()

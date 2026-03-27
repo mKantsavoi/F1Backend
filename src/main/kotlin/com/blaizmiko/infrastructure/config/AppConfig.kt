@@ -16,14 +16,23 @@ data class JwtConfig(
     val refreshTokenExpirySeconds: Long,
 )
 
+data class JolpicaConfig(
+    val baseUrl: String,
+    val requestTimeoutMs: Long,
+    val connectTimeoutMs: Long,
+    val cacheTtlHours: Long,
+)
+
 data class AppConfig(
     val database: DatabaseConfig,
     val jwt: JwtConfig,
+    val jolpica: JolpicaConfig,
 )
 
 fun Application.loadAppConfig(): AppConfig {
     val dbConfig = environment.config.config("database")
     val jwtConfig = environment.config.config("jwt")
+    val jolpicaConfig = environment.config.config("jolpica")
 
     return AppConfig(
         database = DatabaseConfig(
@@ -37,6 +46,12 @@ fun Application.loadAppConfig(): AppConfig {
             audience = jwtConfig.property("audience").getString(),
             accessTokenExpirySeconds = jwtConfig.property("accessTokenExpiry").getString().toLong(),
             refreshTokenExpirySeconds = jwtConfig.property("refreshTokenExpiry").getString().toLong(),
+        ),
+        jolpica = JolpicaConfig(
+            baseUrl = jolpicaConfig.property("baseUrl").getString(),
+            requestTimeoutMs = jolpicaConfig.property("requestTimeoutMs").getString().toLong(),
+            connectTimeoutMs = jolpicaConfig.property("connectTimeoutMs").getString().toLong(),
+            cacheTtlHours = jolpicaConfig.property("cacheTtlHours").getString().toLong(),
         ),
     )
 }
