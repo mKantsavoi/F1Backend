@@ -15,3 +15,7 @@ class ConflictException(
 class ExternalServiceException(
     override val message: String = "External service unavailable",
 ) : RuntimeException(message)
+
+class NotFoundException(
+    override val message: String,
+) : RuntimeException(message)

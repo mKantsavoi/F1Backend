@@ -87,3 +87,97 @@ data class JolpicaLocation(
     val locality: String = "",
     val country: String = "",
 )
+
+// Schedule models
+@Serializable
+data class JolpicaScheduleResponse(
+    @SerialName("MRData") val mrData: ScheduleMRData,
+)
+
+@Serializable
+data class ScheduleMRData(
+    @SerialName("RaceTable") val raceTable: RaceTable,
+)
+
+@Serializable
+data class RaceTable(
+    val season: String,
+    val round: String = "",
+    @SerialName("Races") val races: List<JolpicaRace> = emptyList(),
+)
+
+@Serializable
+data class JolpicaRace(
+    val season: String = "",
+    val round: String,
+    val raceName: String,
+    @SerialName("Circuit") val circuit: JolpicaCircuit,
+    val date: String = "",
+    val time: String = "",
+    @SerialName("FirstPractice") val firstPractice: JolpicaSessionTime? = null,
+    @SerialName("SecondPractice") val secondPractice: JolpicaSessionTime? = null,
+    @SerialName("ThirdPractice") val thirdPractice: JolpicaSessionTime? = null,
+    @SerialName("Qualifying") val qualifying: JolpicaSessionTime? = null,
+    @SerialName("Sprint") val sprint: JolpicaSessionTime? = null,
+    @SerialName("Results") val results: List<JolpicaRaceResult> = emptyList(),
+    @SerialName("QualifyingResults") val qualifyingResults: List<JolpicaQualifyingResult> = emptyList(),
+    @SerialName("SprintResults") val sprintResults: List<JolpicaRaceResult> = emptyList(),
+)
+
+@Serializable
+data class JolpicaSessionTime(
+    val date: String = "",
+    val time: String = "",
+)
+
+// Race results models
+@Serializable
+data class JolpicaRaceResult(
+    val number: String = "",
+    val position: String,
+    @SerialName("Driver") val driver: JolpicaDriver,
+    @SerialName("Constructor") val constructor: JolpicaConstructor,
+    val grid: String = "0",
+    val laps: String = "0",
+    @SerialName("Time") val time: JolpicaResultTime? = null,
+    val points: String = "0",
+    val status: String = "",
+    @SerialName("FastestLap") val fastestLap: JolpicaFastestLap? = null,
+)
+
+@Serializable
+data class JolpicaResultTime(
+    val millis: String = "",
+    val time: String = "",
+)
+
+@Serializable
+data class JolpicaFastestLap(
+    val rank: String = "0",
+    val lap: String = "0",
+    @SerialName("Time") val time: JolpicaLapTime? = null,
+    @SerialName("AverageSpeed") val averageSpeed: JolpicaAverageSpeed? = null,
+)
+
+@Serializable
+data class JolpicaLapTime(
+    val time: String = "",
+)
+
+@Serializable
+data class JolpicaAverageSpeed(
+    val units: String = "",
+    val speed: String = "",
+)
+
+// Qualifying results models
+@Serializable
+data class JolpicaQualifyingResult(
+    val number: String = "",
+    val position: String,
+    @SerialName("Driver") val driver: JolpicaDriver,
+    @SerialName("Constructor") val constructor: JolpicaConstructor,
+    @SerialName("Q1") val q1: String = "",
+    @SerialName("Q2") val q2: String = "",
+    @SerialName("Q3") val q3: String = "",
+)

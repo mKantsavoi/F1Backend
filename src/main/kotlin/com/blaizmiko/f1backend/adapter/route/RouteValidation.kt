@@ -12,3 +12,14 @@ fun validateSeason(season: String) {
         throw ValidationException("Invalid season parameter: must be a year between $FIRST_F1_SEASON and $currentYear")
     }
 }
+
+private const val MAX_ROUNDS_PER_SEASON = 99
+
+fun validateRound(round: String) {
+    val r = round.toIntOrNull()
+    if (r == null || r < 1 || r > MAX_ROUNDS_PER_SEASON) {
+        throw ValidationException(
+            "Invalid round parameter: must be a positive integer between 1 and $MAX_ROUNDS_PER_SEASON",
+        )
+    }
+}
