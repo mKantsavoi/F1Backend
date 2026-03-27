@@ -29,6 +29,7 @@ class GetSprintResults(
     companion object {
         private const val RETRY_THROTTLE_SECONDS = 60L
         private const val CURRENT_SEASON_TTL_SECONDS = 300L
+        private val NO_SPRINT = SprintResultsData("", 0, "", emptyList())
     }
 
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
@@ -41,6 +42,7 @@ class GetSprintResults(
         val key = "sprint:$season:$round"
         val quickCached = cache.get(key)
         if (quickCached != null && quickCached.isFresh()) {
+            throwIfNoSprint(quickCached, season, round)
             return toResult(quickCached, false)
         }
 
@@ -55,8 +57,12 @@ class GetSprintResults(
     ): SprintResultsResult {
         val cached = cache.get(key)
 
+        if (cached != null && cached.isFresh()) {
+            throwIfNoSprint(cached, season, round)
+            return toResult(cached, false)
+        }
+
         return when {
-            cached != null && cached.isFresh() -> toResult(cached, false)
             isThrottled(key) -> staleOrThrow(cached)
             else -> tryFetch(season, round, key, cached)
         }
@@ -76,19 +82,21 @@ class GetSprintResults(
     ): SprintResultsResult =
         try {
             val data = dataSource.fetchSprintResults(season, round)
-            if (data == null) {
-                throw NotFoundException("No sprint results found for season $season round $round")
-            }
             val now = Instant.now()
             val isCurrentSeason = season == Year.now().value.toString()
+            val cacheData = data ?: NO_SPRINT
             val entry =
                 CacheEntry(
-                    data = data as Any,
+                    data = cacheData as Any,
                     fetchedAt = now,
                     expiresAt = if (isCurrentSeason) now.plusSeconds(CURRENT_SEASON_TTL_SECONDS) else Instant.MAX,
                 )
             cache.put(key, entry)
             lastFailedAttempt.remove(key)
+
+            if (data == null) {
+                throw NotFoundException("No sprint results found for season $season round $round")
+            }
 
             SprintResultsResult(
                 season = data.season,
@@ -121,8 +129,21 @@ class GetSprintResults(
         )
     }
 
+    private fun throwIfNoSprint(
+        cached: CacheEntry<Any>,
+        season: String,
+        round: Int,
+    ) {
+        if (cached.data === NO_SPRINT) {
+            throw NotFoundException("No sprint results found for season $season round $round")
+        }
+    }
+
     private fun staleOrThrow(cached: CacheEntry<Any>?): SprintResultsResult {
         if (cached != null) {
+            if (cached.data === NO_SPRINT) {
+                throw NotFoundException("No sprint results available")
+            }
             return toResult(cached, true)
         }
         throw ExternalServiceException("Unable to fetch sprint results. Please try again later.")
