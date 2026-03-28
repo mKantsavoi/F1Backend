@@ -328,7 +328,7 @@ class FavoritesEndpointTest :
                             single { RemoveFavoriteDriver(favoriteRepo) }
                             single { AddFavoriteTeam(favoriteRepo, teamRepo) }
                             single { RemoveFavoriteTeam(favoriteRepo) }
-                            single { GetFavoriteDrivers(favoriteRepo, driverRepo) }
+                            single { GetFavoriteDrivers(favoriteRepo, driverRepo, teamRepo) }
                             single { GetFavoriteTeams(favoriteRepo, teamRepo, driverRepo) }
                             single { CheckDriverFavorite(favoriteRepo) }
                             single { CheckTeamFavorite(favoriteRepo) }

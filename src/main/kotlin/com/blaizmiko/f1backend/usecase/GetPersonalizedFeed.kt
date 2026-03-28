@@ -91,9 +91,12 @@ class GetPersonalizedFeed(
                 null
             }
 
+        val allDrivers = driverRepository.findAll().associateBy { it.id }
+        val allTeams = teamRepository.findAll().associateBy { it.id }
+
         val feedDrivers =
             favoriteDriverIds.mapNotNull { driverId ->
-                val driver = driverRepository.findByDriverId(driverId) ?: return@mapNotNull null
+                val driver = allDrivers[driverId] ?: return@mapNotNull null
                 val standing = driverStandings?.standings?.find { it.driverId == driverId }
                 val raceResult = lastRaceResults?.results?.find { it.driverId == driverId }
                 FeedDriverResult(
@@ -110,7 +113,7 @@ class GetPersonalizedFeed(
 
         val feedTeams =
             favoriteTeamIds.mapNotNull { teamId ->
-                val team = teamRepository.findByTeamId(teamId) ?: return@mapNotNull null
+                val team = allTeams[teamId] ?: return@mapNotNull null
                 val standing = constructorStandings?.standings?.find { it.teamId == teamId }
                 FeedTeamResult(
                     teamId = teamId,

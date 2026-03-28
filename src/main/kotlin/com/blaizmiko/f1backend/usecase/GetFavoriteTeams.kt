@@ -21,9 +21,11 @@ class GetFavoriteTeams(
 ) {
     suspend fun execute(userId: UUID): List<FavoriteTeamDetail> {
         val favorites = favoriteRepository.getFavoriteTeamIds(userId)
+        if (favorites.isEmpty()) return emptyList()
+        val allTeams = teamRepository.findAll().associateBy { it.id }
         val allDrivers = driverRepository.findAll()
         return favorites.mapNotNull { (teamId, addedAt) ->
-            val team = teamRepository.findByTeamId(teamId) ?: return@mapNotNull null
+            val team = allTeams[teamId] ?: return@mapNotNull null
             val teamDrivers = allDrivers.filter { it.teamId == teamId }
             FavoriteTeamDetail(team, teamDrivers, addedAt)
         }

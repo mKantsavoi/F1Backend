@@ -21,7 +21,7 @@ val favoritesModule =
         single { RemoveFavoriteDriver(get()) }
         single { AddFavoriteTeam(get(), get()) }
         single { RemoveFavoriteTeam(get()) }
-        single { GetFavoriteDrivers(get(), get()) }
+        single { GetFavoriteDrivers(get(), get(), get()) }
         single { GetFavoriteTeams(get(), get(), get()) }
         single { CheckDriverFavorite(get()) }
         single { CheckTeamFavorite(get()) }

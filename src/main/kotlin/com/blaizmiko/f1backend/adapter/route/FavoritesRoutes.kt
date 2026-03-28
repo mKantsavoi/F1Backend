@@ -56,13 +56,13 @@ private fun Route.driverFavoritesRoutes() {
                 drivers =
                     favorites.map { fav ->
                         FavoriteDriverDto(
-                            driverId = fav.driver.driverId,
-                            number = fav.driver.number,
+                            driverId = fav.driver.id,
+                            number = fav.driver.number.takeIf { it != 0 },
                             code = fav.driver.code,
                             firstName = fav.driver.firstName,
                             lastName = fav.driver.lastName,
                             photoUrl = fav.driver.photoUrl,
-                            teamName = fav.driver.teamName,
+                            teamName = fav.team?.name,
                             teamColor = null,
                             addedAt = fav.addedAt.toString(),
                         )
