@@ -12,9 +12,11 @@ import com.blaizmiko.f1backend.infrastructure.di.standingsModule
 import com.blaizmiko.f1backend.infrastructure.di.teamsModule
 import com.blaizmiko.f1backend.infrastructure.persistence.DatabaseFactory
 import com.blaizmiko.f1backend.infrastructure.security.JwtProvider
+import com.blaizmiko.f1backend.infrastructure.seed.DriverSeedService
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
+import kotlinx.coroutines.runBlocking
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
@@ -43,6 +45,9 @@ fun Application.module() {
     }
 
     DatabaseFactory.init(appConfig.database)
+
+    val seedService by inject<DriverSeedService>()
+    runBlocking { seedService.seedIfEmpty() }
 
     val jwtProvider by inject<JwtProvider>()
     install(Authentication) {

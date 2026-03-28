@@ -1,10 +1,11 @@
 package com.blaizmiko.f1backend.adapter.route
 
+import com.blaizmiko.f1backend.adapter.dto.DriverDetailResponse
 import com.blaizmiko.f1backend.adapter.dto.DriverDto
+import com.blaizmiko.f1backend.adapter.dto.DriverTeamDto
 import com.blaizmiko.f1backend.adapter.dto.DriversResponse
+import com.blaizmiko.f1backend.usecase.GetDriverDetail
 import com.blaizmiko.f1backend.usecase.GetDrivers
-import io.ktor.http.HttpHeaders
-import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -12,20 +13,16 @@ import org.koin.ktor.ext.inject
 
 fun Route.driverRoutes() {
     val getDrivers by inject<GetDrivers>()
+    val getDriverDetail by inject<GetDriverDetail>()
 
     get("/drivers") {
-        val season = call.queryParameters["season"]?.also { validateSeason(it) } ?: "current"
-        val result = getDrivers.execute(season)
-
-        if (result.isStale) {
-            call.response.header(HttpHeaders.Warning, """110 - "Response is stale"""")
-        }
+        val drivers = getDrivers.execute()
 
         call.respond(
             DriversResponse(
-                season = result.season,
+                season = "current",
                 drivers =
-                    result.drivers.map { driver ->
+                    drivers.map { driver ->
                         DriverDto(
                             id = driver.id,
                             number = driver.number,
@@ -34,8 +31,37 @@ fun Route.driverRoutes() {
                             lastName = driver.lastName,
                             nationality = driver.nationality,
                             dateOfBirth = driver.dateOfBirth?.toString(),
+                            photoUrl = driver.photoUrl,
                         )
                     },
+            ),
+        )
+    }
+
+    get("/drivers/{driverId}") {
+        val driverId =
+            call.parameters["driverId"]
+                ?: throw com.blaizmiko.f1backend.domain.model
+                    .ValidationException("Missing driverId")
+        val detail = getDriverDetail.execute(driverId)
+
+        call.respond(
+            DriverDetailResponse(
+                driverId = detail.driverId,
+                number = detail.number,
+                code = detail.code,
+                firstName = detail.firstName,
+                lastName = detail.lastName,
+                nationality = detail.nationality,
+                dateOfBirth = detail.dateOfBirth?.toString(),
+                photoUrl = detail.photoUrl,
+                team =
+                    if (detail.teamId != null && detail.teamName != null) {
+                        DriverTeamDto(teamId = detail.teamId, name = detail.teamName)
+                    } else {
+                        null
+                    },
+                biography = detail.biography,
             ),
         )
     }
