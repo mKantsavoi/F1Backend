@@ -1,6 +1,24 @@
 ktor:
     application:
         modules:
-            - com.blaizmiko.ApplicationKt.module
+            - com.blaizmiko.f1backend.ApplicationKt.module
     deployment:
         port: 8080
+
+database:
+    url: ${DB_URL}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+jwt:
+    secret: ${JWT_SECRET}
+    issuer: "f1backend"
+    audience: "f1backend-api"
+    accessTokenExpiry: "900"
+    refreshTokenExpiry: "2592000"
+
+jolpica:
+    baseUrl: "https://api.jolpi.ca/ergast/f1"
+    requestTimeoutMs: "10000"
+    connectTimeoutMs: "5000"
+    cacheTtlHours: "24"
