@@ -4,6 +4,7 @@ import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
 import com.blaizmiko.f1backend.adapter.route.authRoutes
 import com.blaizmiko.f1backend.adapter.route.circuitRoutes
 import com.blaizmiko.f1backend.adapter.route.driverRoutes
+import com.blaizmiko.f1backend.adapter.route.favoritesRoutes
 import com.blaizmiko.f1backend.adapter.route.raceRoutes
 import com.blaizmiko.f1backend.adapter.route.scheduleRoutes
 import com.blaizmiko.f1backend.adapter.route.standingsRoutes
@@ -70,6 +71,7 @@ fun Application.configureRouting() {
                 scheduleRoutes()
                 raceRoutes()
                 standingsRoutes()
+                favoritesRoutes()
             }
         }
     }

@@ -6,6 +6,7 @@ import com.blaizmiko.f1backend.infrastructure.di.circuitsModule
 import com.blaizmiko.f1backend.infrastructure.di.clientModule
 import com.blaizmiko.f1backend.infrastructure.di.coreModule
 import com.blaizmiko.f1backend.infrastructure.di.driversModule
+import com.blaizmiko.f1backend.infrastructure.di.favoritesModule
 import com.blaizmiko.f1backend.infrastructure.di.racesModule
 import com.blaizmiko.f1backend.infrastructure.di.scheduleModule
 import com.blaizmiko.f1backend.infrastructure.di.standingsModule
@@ -41,6 +42,7 @@ fun Application.module() {
             scheduleModule,
             racesModule,
             standingsModule,
+            favoritesModule,
         )
     }
 
