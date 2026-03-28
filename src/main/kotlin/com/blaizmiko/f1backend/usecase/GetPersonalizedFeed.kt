@@ -1,6 +1,8 @@
 package com.blaizmiko.f1backend.usecase
 
+import com.blaizmiko.f1backend.domain.repository.DriverRepository
 import com.blaizmiko.f1backend.domain.repository.FavoriteRepository
+import com.blaizmiko.f1backend.domain.repository.TeamRepository
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -31,6 +33,8 @@ data class FeedTeamResult(
 
 class GetPersonalizedFeed(
     private val favoriteRepository: FavoriteRepository,
+    private val driverRepository: DriverRepository,
+    private val teamRepository: TeamRepository,
     private val getDriverStandings: GetDriverStandings,
     private val getConstructorStandings: GetConstructorStandings,
     private val getRaceResults: GetRaceResults,
@@ -88,13 +92,14 @@ class GetPersonalizedFeed(
             }
 
         val feedDrivers =
-            favoriteDriverIds.map { driverId ->
+            favoriteDriverIds.mapNotNull { driverId ->
+                val driver = driverRepository.findByDriverId(driverId) ?: return@mapNotNull null
                 val standing = driverStandings?.standings?.find { it.driverId == driverId }
                 val raceResult = lastRaceResults?.results?.find { it.driverId == driverId }
                 FeedDriverResult(
                     driverId = driverId,
-                    code = standing?.driverCode ?: "",
-                    photoUrl = null,
+                    code = driver.code,
+                    photoUrl = driver.photoUrl,
                     championshipPosition = standing?.position,
                     championshipPoints = standing?.points,
                     lastRaceName = lastRaceResults?.raceName,
@@ -104,11 +109,12 @@ class GetPersonalizedFeed(
             }
 
         val feedTeams =
-            favoriteTeamIds.map { teamId ->
+            favoriteTeamIds.mapNotNull { teamId ->
+                val team = teamRepository.findByTeamId(teamId) ?: return@mapNotNull null
                 val standing = constructorStandings?.standings?.find { it.teamId == teamId }
                 FeedTeamResult(
                     teamId = teamId,
-                    name = standing?.teamName ?: "",
+                    name = team.name,
                     championshipPosition = standing?.position,
                     championshipPoints = standing?.points,
                 )

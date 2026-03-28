@@ -17,30 +17,32 @@ import kotlin.uuid.toKotlinUuid
 class ExposedFavoriteRepository : FavoriteRepository {
     private fun UUID.toKUuid(): Uuid = this.toKotlinUuid()
 
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun addFavoriteDriver(
         userId: UUID,
         driverId: String,
     ): Pair<Boolean, Instant> =
-        dbQuery {
-            val existing =
-                FavoriteDriversTable
-                    .selectAll()
-                    .where {
-                        (FavoriteDriversTable.userId eq userId.toKUuid()) and
-                            (FavoriteDriversTable.driverId eq driverId)
-                    }.singleOrNull()
-
-            if (existing != null) {
-                Pair(false, existing[FavoriteDriversTable.createdAt])
-            } else {
-                val now = Instant.now()
+        try {
+            val now = Instant.now()
+            dbQuery {
                 FavoriteDriversTable.insert {
                     it[FavoriteDriversTable.id] = Uuid.random()
                     it[FavoriteDriversTable.userId] = userId.toKUuid()
                     it[FavoriteDriversTable.driverId] = driverId
                     it[FavoriteDriversTable.createdAt] = now
                 }
-                Pair(true, now)
+            }
+            Pair(true, now)
+        } catch (_: Exception) {
+            dbQuery {
+                val existing =
+                    FavoriteDriversTable
+                        .selectAll()
+                        .where {
+                            (FavoriteDriversTable.userId eq userId.toKUuid()) and
+                                (FavoriteDriversTable.driverId eq driverId)
+                        }.single()
+                Pair(false, existing[FavoriteDriversTable.createdAt])
             }
         }
 
@@ -76,30 +78,32 @@ class ExposedFavoriteRepository : FavoriteRepository {
                 }.count() > 0
         }
 
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun addFavoriteTeam(
         userId: UUID,
         teamId: String,
     ): Pair<Boolean, Instant> =
-        dbQuery {
-            val existing =
-                FavoriteTeamsTable
-                    .selectAll()
-                    .where {
-                        (FavoriteTeamsTable.userId eq userId.toKUuid()) and
-                            (FavoriteTeamsTable.teamId eq teamId)
-                    }.singleOrNull()
-
-            if (existing != null) {
-                Pair(false, existing[FavoriteTeamsTable.createdAt])
-            } else {
-                val now = Instant.now()
+        try {
+            val now = Instant.now()
+            dbQuery {
                 FavoriteTeamsTable.insert {
                     it[FavoriteTeamsTable.id] = Uuid.random()
                     it[FavoriteTeamsTable.userId] = userId.toKUuid()
                     it[FavoriteTeamsTable.teamId] = teamId
                     it[FavoriteTeamsTable.createdAt] = now
                 }
-                Pair(true, now)
+            }
+            Pair(true, now)
+        } catch (_: Exception) {
+            dbQuery {
+                val existing =
+                    FavoriteTeamsTable
+                        .selectAll()
+                        .where {
+                            (FavoriteTeamsTable.userId eq userId.toKUuid()) and
+                                (FavoriteTeamsTable.teamId eq teamId)
+                        }.single()
+                Pair(false, existing[FavoriteTeamsTable.createdAt])
             }
         }
 

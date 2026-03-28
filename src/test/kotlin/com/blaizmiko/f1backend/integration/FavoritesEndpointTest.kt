@@ -335,6 +335,8 @@ class FavoritesEndpointTest :
                             single {
                                 GetPersonalizedFeed(
                                     favoriteRepo,
+                                    driverRepo,
+                                    teamRepo,
                                     getDriverStandings,
                                     getConstructorStandings,
                                     getRaceResults,
