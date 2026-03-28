@@ -1,6 +1,6 @@
 # f1backend Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-27
+Auto-generated from all feature plans. Last updated: 2026-03-28
 
 ## Active Technologies
 

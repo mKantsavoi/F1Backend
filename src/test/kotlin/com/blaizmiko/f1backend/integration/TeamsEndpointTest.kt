@@ -1,14 +1,11 @@
 package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.TeamsResponse
-import com.blaizmiko.f1backend.adapter.port.TeamCache
 import com.blaizmiko.f1backend.adapter.route.teamRoutes
-import com.blaizmiko.f1backend.domain.model.CacheEntry
-import com.blaizmiko.f1backend.domain.model.ExternalServiceException
-import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.model.Team
-import com.blaizmiko.f1backend.domain.port.TeamDataSource
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryTeamCache
+import com.blaizmiko.f1backend.domain.repository.TeamRepository
+import com.blaizmiko.f1backend.infrastructure.persistence.DatabaseFactory
+import com.blaizmiko.f1backend.infrastructure.persistence.repository.ExposedTeamRepository
 import com.blaizmiko.f1backend.usecase.GetTeams
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
@@ -17,15 +14,12 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
-import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.plugins.statuspages.exception
 import io.ktor.server.response.respond
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -33,12 +27,19 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
-import java.time.Instant
+import org.testcontainers.containers.PostgreSQLContainer
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse as Err
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
 class TeamsEndpointTest :
     StringSpec({
+
+        val postgres =
+            PostgreSQLContainer("postgres:16-alpine").apply {
+                withDatabaseName("f1backend_test")
+                withUsername("test")
+                withPassword("test")
+            }
 
         val sampleTeams =
             listOf(
@@ -46,36 +47,26 @@ class TeamsEndpointTest :
                 Team("mercedes", "Mercedes-AMG Petronas", "German"),
             )
 
-        class FakeTeamDataSource(
-            private var teams: List<Team> = emptyList(),
-            private var season: String = "2026",
-            var shouldFail: Boolean = false,
-            var callCount: Int = 0,
-        ) : TeamDataSource {
-            override suspend fun fetchTeams(season: String): Pair<String, List<Team>> {
-                callCount++
-                if (shouldFail) throw ExternalServiceException("Jolpica unavailable")
-                return this.season to teams
-            }
+        beforeSpec {
+            postgres.start()
+            DatabaseFactory.init(
+                com.blaizmiko.f1backend.infrastructure.config.DatabaseConfig(
+                    url = postgres.jdbcUrl,
+                    user = postgres.username,
+                    password = postgres.password,
+                ),
+            )
+        }
+
+        afterSpec {
+            postgres.stop()
         }
 
         fun teamsTestApp(
-            dataSource: TeamDataSource,
-            cache: TeamCache = InMemoryTeamCache(),
-            cacheTtlHours: Long = 24,
+            repository: TeamRepository = ExposedTeamRepository(),
             block: suspend ApplicationTestBuilder.() -> Unit,
         ) = testApplication {
-            install(ServerContentNegotiation) {
-                json()
-            }
-            install(StatusPages) {
-                exception<com.blaizmiko.f1backend.domain.model.ValidationException> { call, cause ->
-                    call.respond(HttpStatusCode.BadRequest, Err("validation_error", cause.message))
-                }
-                exception<ExternalServiceException> { call, cause ->
-                    call.respond(HttpStatusCode.BadGateway, Err("external_service_unavailable", cause.message))
-                }
-            }
+            install(ServerContentNegotiation) { json() }
             install(Authentication) {
                 jwt {
                     realm = "test"
@@ -97,7 +88,7 @@ class TeamsEndpointTest :
                 }
             }
 
-            val getTeams = GetTeams(cache, dataSource, cacheTtlHours)
+            val getTeams = GetTeams(repository)
 
             install(Koin) {
                 modules(
@@ -131,120 +122,31 @@ class TeamsEndpointTest :
                         .HMAC256("test-secret-that-is-at-least-256-bits-long-for-hmac"),
                 )
 
-        "happy path: returns current season teams" {
-            val dataSource = FakeTeamDataSource(teams = sampleTeams, season = "2026")
-            teamsTestApp(dataSource) {
+        "happy path: returns teams from database" {
+            val repo = ExposedTeamRepository()
+            repo.insertAll(sampleTeams)
+
+            teamsTestApp(repo) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 
-                val response =
-                    client.get("/api/v1/teams") {
-                        bearerAuth(token)
-                    }
+                val response = client.get("/api/v1/teams") { bearerAuth(token) }
 
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<TeamsResponse>()
-                body.season shouldBe "2026"
+                body.season shouldBe "current"
                 body.teams shouldHaveSize 2
                 body.teams[0].teamId shouldBe "red_bull"
                 body.teams[0].name shouldBe "Red Bull Racing"
                 body.teams[0].nationality shouldBe "Austrian"
-                response.headers[HttpHeaders.Warning] shouldBe null
             }
         }
 
         "401 without token" {
-            val dataSource = FakeTeamDataSource(teams = sampleTeams)
-            teamsTestApp(dataSource) {
+            teamsTestApp {
                 val client = createClient { install(ContentNegotiation) { json() } }
-
                 val response = client.get("/api/v1/teams")
                 response.status shouldBe HttpStatusCode.Unauthorized
-            }
-        }
-
-        "season parameter: valid year returns teams for that season" {
-            val dataSource = FakeTeamDataSource(teams = sampleTeams, season = "2024")
-            teamsTestApp(dataSource) {
-                val client = createClient { install(ContentNegotiation) { json() } }
-                val token = generateToken()
-
-                val response = client.get("/api/v1/teams?season=2024") { bearerAuth(token) }
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<TeamsResponse>()
-                body.season shouldBe "2024"
-            }
-        }
-
-        "season parameter: invalid value returns 400" {
-            val dataSource = FakeTeamDataSource()
-            teamsTestApp(dataSource) {
-                val client = createClient { install(ContentNegotiation) { json() } }
-                val token = generateToken()
-
-                val response = client.get("/api/v1/teams?season=abc") { bearerAuth(token) }
-                response.status shouldBe HttpStatusCode.BadRequest
-
-                val response2 = client.get("/api/v1/teams?season=1800") { bearerAuth(token) }
-                response2.status shouldBe HttpStatusCode.BadRequest
-            }
-        }
-
-        "cache hit: second request does not call data source" {
-            val dataSource = FakeTeamDataSource(teams = sampleTeams, season = "2026")
-            teamsTestApp(dataSource) {
-                val client = createClient { install(ContentNegotiation) { json() } }
-                val token = generateToken()
-
-                client.get("/api/v1/teams") { bearerAuth(token) }
-                dataSource.callCount shouldBe 1
-
-                val response = client.get("/api/v1/teams") { bearerAuth(token) }
-                response.status shouldBe HttpStatusCode.OK
-                dataSource.callCount shouldBe 1
-
-                val body = response.body<TeamsResponse>()
-                body.season shouldBe "2026"
-            }
-        }
-
-        "stale cache fallback: returns data with Warning header when source fails" {
-            val dataSource = FakeTeamDataSource(teams = sampleTeams, season = "2026")
-            val cache = InMemoryTeamCache()
-
-            cache.put(
-                "current",
-                CacheEntry(
-                    data = SeasonCache("2026", sampleTeams),
-                    fetchedAt = Instant.now().minusSeconds(90_000),
-                    expiresAt = Instant.now().minusSeconds(3_600),
-                ),
-            )
-            dataSource.shouldFail = true
-
-            teamsTestApp(dataSource, cache) {
-                val client = createClient { install(ContentNegotiation) { json() } }
-                val token = generateToken()
-
-                val response = client.get("/api/v1/teams") { bearerAuth(token) }
-                response.status shouldBe HttpStatusCode.OK
-                response.headers[HttpHeaders.Warning] shouldBe """110 - "Response is stale""""
-
-                val body = response.body<TeamsResponse>()
-                body.teams shouldHaveSize 2
-            }
-        }
-
-        "502 when source fails and no cache exists" {
-            val dataSource = FakeTeamDataSource(shouldFail = true)
-            teamsTestApp(dataSource) {
-                val client = createClient { install(ContentNegotiation) { json() } }
-                val token = generateToken()
-
-                val response = client.get("/api/v1/teams") { bearerAuth(token) }
-                response.status shouldBe HttpStatusCode.BadGateway
-                val body = response.body<Err>()
-                body.error shouldBe "external_service_unavailable"
             }
         }
     })

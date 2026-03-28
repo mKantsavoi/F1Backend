@@ -1,7 +1,9 @@
 package com.blaizmiko.f1backend.infrastructure.persistence
 
 import com.blaizmiko.f1backend.infrastructure.config.DatabaseConfig
+import com.blaizmiko.f1backend.infrastructure.persistence.table.DriversTable
 import com.blaizmiko.f1backend.infrastructure.persistence.table.RefreshTokensTable
+import com.blaizmiko.f1backend.infrastructure.persistence.table.TeamsTable
 import com.blaizmiko.f1backend.infrastructure.persistence.table.UsersTable
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
@@ -27,7 +29,7 @@ object DatabaseFactory {
             )
         Database.connect(dataSource)
         transaction {
-            SchemaUtils.create(UsersTable, RefreshTokensTable)
+            SchemaUtils.create(UsersTable, RefreshTokensTable, TeamsTable, DriversTable)
         }
     }
 
