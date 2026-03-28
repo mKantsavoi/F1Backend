@@ -50,8 +50,14 @@ jobs:
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
           PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
           REPOSITORY: '${{ github.repository }}'
-          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          ADDITIONAL_CONTEXT: |
+            ${{ inputs.additional_context }}
+            
+            CRITICAL INSTRUCTION FOR FILE CREATION:
+            If you need to write scripts (like python parsers) or create files using bash, you MUST use the `cat` command with your heredocs. 
+            ✅ Correct: `cat << 'EOF' > script.py`
+            ❌ Incorrect: `<< 'EOF' > script.py`
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -67,11 +73,10 @@ jobs:
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini-review'
           # Explicitly set the PR number to handle `issue_comment` triggers (which GitHub treats as issues, not PRs)
-          github_pr_number: '${{ github.event.pull_request.number }}'
           settings: |-
             {
               "model": {
-                "maxSessionTurns": 25
+                "maxSessionTurns": 50
               },
               "telemetry": {
                 "enabled": true,
@@ -105,7 +110,8 @@ jobs:
                   "run_shell_command(echo)",
                   "run_shell_command(grep)",
                   "run_shell_command(head)",
-                  "run_shell_command(tail)"
+                  "run_shell_command(tail)",
+                  "run_shell_command(python3)"
                 ]
               }
             }
