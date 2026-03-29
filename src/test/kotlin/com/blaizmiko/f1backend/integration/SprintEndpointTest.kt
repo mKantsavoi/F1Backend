@@ -1,16 +1,16 @@
 package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.RaceResultsResponse
-import com.blaizmiko.f1backend.adapter.port.RaceResultCache
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.adapter.route.raceRoutes
-import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.RaceResult
 import com.blaizmiko.f1backend.domain.port.QualifyingResultsData
 import com.blaizmiko.f1backend.domain.port.RaceDataSource
 import com.blaizmiko.f1backend.domain.port.RaceResultsData
 import com.blaizmiko.f1backend.domain.port.SprintResultsData
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryRaceResultCache
+import com.blaizmiko.f1backend.infrastructure.cache.CacheRegistry
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import com.blaizmiko.f1backend.usecase.GetQualifyingResults
 import com.blaizmiko.f1backend.usecase.GetRaceResults
 import com.blaizmiko.f1backend.usecase.GetSprintResults
@@ -37,7 +37,6 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
-import java.time.Instant
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse as Err
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
@@ -88,7 +87,7 @@ class SprintEndpointTest :
 
         fun sprintTestApp(
             dataSource: RaceDataSource,
-            cache: RaceResultCache = InMemoryRaceResultCache(),
+            cacheProvider: CacheProvider = CacheRegistry(),
             block: suspend ApplicationTestBuilder.() -> Unit,
         ) = testApplication {
             install(ServerContentNegotiation) { json() }
@@ -124,9 +123,9 @@ class SprintEndpointTest :
                 }
             }
 
-            val getRaceResults = GetRaceResults(cache, dataSource)
-            val getQualifyingResults = GetQualifyingResults(cache, dataSource)
-            val getSprintResults = GetSprintResults(cache, dataSource)
+            val getRaceResults = GetRaceResults(cacheProvider, dataSource)
+            val getQualifyingResults = GetQualifyingResults(cacheProvider, dataSource)
+            val getSprintResults = GetSprintResults(cacheProvider, dataSource)
 
             install(Koin) {
                 modules(
@@ -222,19 +221,12 @@ class SprintEndpointTest :
         "stale cache fallback: returns data with Warning header when source fails" {
             val sprintData = SprintResultsData("2025", 4, "Sprint GP", sampleSprintResults)
             val dataSource = FakeRaceDataSource(sprintResults = sprintData)
-            val cache = InMemoryRaceResultCache()
+            val cacheProvider = CacheRegistry()
 
-            cache.put(
-                "sprint:2025:4",
-                CacheEntry(
-                    data = sprintData as Any,
-                    fetchedAt = Instant.now().minusSeconds(90_000),
-                    expiresAt = Instant.now().minusSeconds(3_600),
-                ),
-            )
+            cacheProvider.putFallback(CacheSpec.SPRINT_HISTORICAL, "sprint:2025:4", sprintData)
             dataSource.shouldFail = true
 
-            sprintTestApp(dataSource, cache) {
+            sprintTestApp(dataSource, cacheProvider) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 

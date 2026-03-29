@@ -1,11 +1,11 @@
 package com.blaizmiko.f1backend.usecase
 
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.domain.repository.DriverRepository
 import com.blaizmiko.f1backend.domain.repository.FavoriteRepository
 import com.blaizmiko.f1backend.domain.repository.TeamRepository
-import java.time.Instant
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 data class PersonalizedFeedResult(
     val favoriteDrivers: List<FeedDriverResult>,
@@ -31,6 +31,7 @@ data class FeedTeamResult(
     val championshipPoints: Double?,
 )
 
+@Suppress("LongParameterList")
 class GetPersonalizedFeed(
     private val favoriteRepository: FavoriteRepository,
     private val driverRepository: DriverRepository,
@@ -38,23 +39,15 @@ class GetPersonalizedFeed(
     private val getDriverStandings: GetDriverStandings,
     private val getConstructorStandings: GetConstructorStandings,
     private val getRaceResults: GetRaceResults,
+    private val cacheProvider: CacheProvider,
 ) {
-    companion object {
-        private const val CACHE_TTL_SECONDS = 30L
-    }
-
-    private data class CachedFeed(
-        val result: PersonalizedFeedResult,
-        val expiresAt: Instant,
-    )
-
-    private val cache = ConcurrentHashMap<UUID, CachedFeed>()
+    private val cache = cacheProvider.getCache<UUID, PersonalizedFeedResult>(CacheSpec.PERSONALIZED_FEED)
 
     @Suppress("TooGenericExceptionCaught", "ReturnCount")
     suspend fun execute(userId: UUID): PersonalizedFeedResult {
-        val cached = cache[userId]
-        if (cached != null && Instant.now().isBefore(cached.expiresAt)) {
-            return cached.result
+        val cached = cache.getIfPresent(userId)
+        if (cached != null) {
+            return cached
         }
 
         val favoriteDriverIds = favoriteRepository.getFavoriteDriverIds(userId).map { it.first }.toSet()
@@ -62,7 +55,7 @@ class GetPersonalizedFeed(
 
         if (favoriteDriverIds.isEmpty() && favoriteTeamIds.isEmpty()) {
             val empty = PersonalizedFeedResult(emptyList(), emptyList(), emptyList())
-            cacheResult(userId, empty)
+            cache.put(userId, empty)
             return empty
         }
 
@@ -124,14 +117,7 @@ class GetPersonalizedFeed(
             }
 
         val result = PersonalizedFeedResult(feedDrivers, feedTeams, emptyList())
-        cacheResult(userId, result)
+        cache.put(userId, result)
         return result
-    }
-
-    private fun cacheResult(
-        userId: UUID,
-        result: PersonalizedFeedResult,
-    ) {
-        cache[userId] = CachedFeed(result, Instant.now().plusSeconds(CACHE_TTL_SECONDS))
     }
 }

@@ -1,11 +1,11 @@
 package com.blaizmiko.f1backend.usecase
 
-import com.blaizmiko.f1backend.adapter.port.DriverStandingsCache
-import com.blaizmiko.f1backend.domain.model.CacheEntry
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.domain.model.DriverStanding
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.StandingsData
 import com.blaizmiko.f1backend.domain.port.StandingsDataSource
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,21 +21,22 @@ data class DriverStandingsResult(
 )
 
 class GetDriverStandings(
-    private val cache: DriverStandingsCache,
+    private val cacheProvider: CacheProvider,
     private val dataSource: StandingsDataSource,
 ) {
     companion object {
         private const val RETRY_THROTTLE_SECONDS = 60L
-        private const val CURRENT_SEASON_TTL_SECONDS = 3600L
     }
 
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
     private val lastFailedAttempt = ConcurrentHashMap<String, Instant>()
 
     suspend fun execute(season: String = "current"): DriverStandingsResult {
-        val quickCached = cache.get(season)
-        if (quickCached != null && quickCached.isFresh()) {
-            return freshResult(quickCached.data)
+        val spec = specForSeason(season)
+        val cache = cacheProvider.getCache<String, StandingsData<DriverStanding>>(spec)
+        val quickCached = cache.getIfPresent(season)
+        if (quickCached != null) {
+            return freshResult(quickCached)
         }
 
         val mutex = fetchMutexes.getOrPut(season) { Mutex() }
@@ -43,12 +44,14 @@ class GetDriverStandings(
     }
 
     private suspend fun fetchOrServeCached(season: String): DriverStandingsResult {
-        val cached = cache.get(season)
+        val spec = specForSeason(season)
+        val cache = cacheProvider.getCache<String, StandingsData<DriverStanding>>(spec)
+        val cached = cache.getIfPresent(season)
 
         return when {
-            cached != null && cached.isFresh() -> freshResult(cached.data)
-            isThrottled(season) -> staleOrThrow(cached)
-            else -> tryFetch(season, cached)
+            cached != null -> freshResult(cached)
+            isThrottled(season) -> staleOrThrow(season)
+            else -> tryFetch(season)
         }
     }
 
@@ -58,26 +61,13 @@ class GetDriverStandings(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun tryFetch(
-        season: String,
-        cached: CacheEntry<StandingsData<DriverStanding>>?,
-    ): DriverStandingsResult =
+    private suspend fun tryFetch(season: String): DriverStandingsResult =
         try {
             val data = dataSource.fetchDriverStandings(season)
-            val now = Instant.now()
-            val ttl =
-                if (data.season == Year.now().value.toString()) {
-                    CURRENT_SEASON_TTL_SECONDS
-                } else {
-                    Long.MAX_VALUE / 2
-                }
-            val entry =
-                CacheEntry(
-                    data = data,
-                    fetchedAt = now,
-                    expiresAt = if (ttl == Long.MAX_VALUE / 2) Instant.MAX else now.plusSeconds(ttl),
-                )
-            cache.put(season, entry)
+            val spec = specForResolvedSeason(data.season)
+            val cache = cacheProvider.getCache<String, StandingsData<DriverStanding>>(spec)
+            cache.put(season, data)
+            cacheProvider.putFallback(spec, season, data)
             lastFailedAttempt.remove(season)
 
             freshResult(data)
@@ -85,7 +75,7 @@ class GetDriverStandings(
             throw e
         } catch (_: Exception) {
             lastFailedAttempt[season] = Instant.now()
-            staleOrThrow(cached)
+            staleOrThrow(season)
         }
 
     private fun freshResult(data: StandingsData<DriverStanding>): DriverStandingsResult =
@@ -96,15 +86,33 @@ class GetDriverStandings(
             isStale = false,
         )
 
-    private fun staleOrThrow(cached: CacheEntry<StandingsData<DriverStanding>>?): DriverStandingsResult {
-        if (cached != null) {
-            return DriverStandingsResult(
-                season = cached.data.season,
-                round = cached.data.round,
-                standings = cached.data.standings,
-                isStale = true,
-            )
+    @Suppress("UNCHECKED_CAST")
+    private fun staleOrThrow(season: String): DriverStandingsResult {
+        for (spec in listOf(CacheSpec.DRIVER_STANDINGS, CacheSpec.DRIVER_STANDINGS_HISTORICAL)) {
+            val fallback = cacheProvider.getFallback<String>(spec, season) as? StandingsData<DriverStanding>
+            if (fallback != null) {
+                return DriverStandingsResult(
+                    season = fallback.season,
+                    round = fallback.round,
+                    standings = fallback.standings,
+                    isStale = true,
+                )
+            }
         }
         throw ExternalServiceException("Unable to fetch driver standings. Please try again later.")
     }
+
+    private fun specForSeason(season: String): CacheSpec =
+        if (season == "current" || season == Year.now().value.toString()) {
+            CacheSpec.DRIVER_STANDINGS
+        } else {
+            CacheSpec.DRIVER_STANDINGS_HISTORICAL
+        }
+
+    private fun specForResolvedSeason(resolvedSeason: String): CacheSpec =
+        if (resolvedSeason == Year.now().value.toString()) {
+            CacheSpec.DRIVER_STANDINGS
+        } else {
+            CacheSpec.DRIVER_STANDINGS_HISTORICAL
+        }
 }

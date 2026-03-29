@@ -1,11 +1,11 @@
 package com.blaizmiko.f1backend.usecase
 
-import com.blaizmiko.f1backend.adapter.port.RaceResultCache
-import com.blaizmiko.f1backend.domain.model.CacheEntry
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.QualifyingResult
 import com.blaizmiko.f1backend.domain.port.QualifyingResultsData
 import com.blaizmiko.f1backend.domain.port.RaceDataSource
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -22,12 +22,11 @@ data class QualifyingResultsResult(
 )
 
 class GetQualifyingResults(
-    private val cache: RaceResultCache,
+    private val cacheProvider: CacheProvider,
     private val dataSource: RaceDataSource,
 ) {
     companion object {
         private const val RETRY_THROTTLE_SECONDS = 60L
-        private const val CURRENT_SEASON_TTL_SECONDS = 300L
     }
 
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
@@ -38,26 +37,30 @@ class GetQualifyingResults(
         round: Int,
     ): QualifyingResultsResult {
         val key = "qualifying:$season:$round"
-        val quickCached = cache.get(key)
-        if (quickCached != null && quickCached.isFresh()) {
+        val spec = specForSeason(season)
+        val cache = cacheProvider.getCache<String, QualifyingResultsData>(spec)
+        val quickCached = cache.getIfPresent(key)
+        if (quickCached != null) {
             return toResult(quickCached, false)
         }
 
         val mutex = fetchMutexes.getOrPut(key) { Mutex() }
-        return mutex.withLock { fetchOrServeCached(season, round, key) }
+        return mutex.withLock { fetchOrServeCached(season, round, key, spec) }
     }
 
     private suspend fun fetchOrServeCached(
         season: String,
         round: Int,
         key: String,
+        spec: CacheSpec,
     ): QualifyingResultsResult {
-        val cached = cache.get(key)
+        val cache = cacheProvider.getCache<String, QualifyingResultsData>(spec)
+        val cached = cache.getIfPresent(key)
 
         return when {
-            cached != null && cached.isFresh() -> toResult(cached, false)
-            isThrottled(key) -> staleOrThrow(cached)
-            else -> tryFetch(season, round, key, cached)
+            cached != null -> toResult(cached, false)
+            isThrottled(key) -> staleOrThrow(key, spec)
+            else -> tryFetch(season, round, key, spec)
         }
     }
 
@@ -71,19 +74,13 @@ class GetQualifyingResults(
         season: String,
         round: Int,
         key: String,
-        cached: CacheEntry<Any>?,
+        spec: CacheSpec,
     ): QualifyingResultsResult =
         try {
             val data = dataSource.fetchQualifyingResults(season, round)
-            val now = Instant.now()
-            val isCurrentSeason = season == Year.now().value.toString()
-            val entry =
-                CacheEntry(
-                    data = data as Any,
-                    fetchedAt = now,
-                    expiresAt = if (isCurrentSeason) now.plusSeconds(CURRENT_SEASON_TTL_SECONDS) else Instant.MAX,
-                )
-            cache.put(key, entry)
+            val cache = cacheProvider.getCache<String, QualifyingResultsData>(spec)
+            cache.put(key, data)
+            cacheProvider.putFallback(spec, key, data)
             lastFailedAttempt.remove(key)
 
             QualifyingResultsResult(
@@ -97,28 +94,32 @@ class GetQualifyingResults(
             throw e
         } catch (_: Exception) {
             lastFailedAttempt[key] = Instant.now()
-            staleOrThrow(cached)
+            staleOrThrow(key, spec)
         }
 
-    @Suppress("UNCHECKED_CAST")
     private fun toResult(
-        cached: CacheEntry<Any>,
+        data: QualifyingResultsData,
         isStale: Boolean,
-    ): QualifyingResultsResult {
-        val data = cached.data as QualifyingResultsData
-        return QualifyingResultsResult(
+    ): QualifyingResultsResult =
+        QualifyingResultsResult(
             season = data.season,
             round = data.round,
             raceName = data.raceName,
             qualifying = data.qualifying,
             isStale = isStale,
         )
-    }
 
-    private fun staleOrThrow(cached: CacheEntry<Any>?): QualifyingResultsResult {
-        if (cached != null) {
-            return toResult(cached, true)
+    private fun staleOrThrow(
+        key: String,
+        spec: CacheSpec,
+    ): QualifyingResultsResult {
+        val fallback = cacheProvider.getFallback<String>(spec, key) as? QualifyingResultsData
+        if (fallback != null) {
+            return toResult(fallback, true)
         }
         throw ExternalServiceException("Unable to fetch qualifying results. Please try again later.")
     }
+
+    private fun specForSeason(season: String): CacheSpec =
+        if (season == Year.now().value.toString()) CacheSpec.QUALIFYING else CacheSpec.QUALIFYING_HISTORICAL
 }

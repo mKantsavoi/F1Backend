@@ -2,16 +2,15 @@ package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.ConstructorStandingsResponse
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
-import com.blaizmiko.f1backend.adapter.port.ConstructorStandingsCache
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.adapter.route.standingsRoutes
-import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.ConstructorStanding
 import com.blaizmiko.f1backend.domain.model.DriverStanding
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.StandingsData
 import com.blaizmiko.f1backend.domain.port.StandingsDataSource
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryConstructorStandingsCache
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryDriverStandingsCache
+import com.blaizmiko.f1backend.infrastructure.cache.CacheRegistry
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import com.blaizmiko.f1backend.usecase.GetConstructorStandings
 import com.blaizmiko.f1backend.usecase.GetDriverStandings
 import io.kotest.core.spec.style.StringSpec
@@ -37,7 +36,6 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
-import java.time.Instant
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse as Err
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
@@ -83,7 +81,7 @@ class ConstructorStandingsEndpointTest :
 
         fun standingsTestApp(
             dataSource: StandingsDataSource,
-            constructorCache: ConstructorStandingsCache = InMemoryConstructorStandingsCache(),
+            cacheProvider: CacheProvider = CacheRegistry(),
             block: suspend ApplicationTestBuilder.() -> Unit,
         ) = testApplication {
             install(ServerContentNegotiation) {
@@ -118,8 +116,8 @@ class ConstructorStandingsEndpointTest :
                 }
             }
 
-            val getDriverStandings = GetDriverStandings(InMemoryDriverStandingsCache(), dataSource)
-            val getConstructorStandings = GetConstructorStandings(constructorCache, dataSource)
+            val getDriverStandings = GetDriverStandings(cacheProvider, dataSource)
+            val getConstructorStandings = GetConstructorStandings(cacheProvider, dataSource)
 
             install(Koin) {
                 modules(
@@ -210,19 +208,16 @@ class ConstructorStandingsEndpointTest :
 
         "stale cache fallback: returns data with Warning header when source fails" {
             val dataSource = FakeStandingsDataSource(constructorStandings = sampleConstructorStandings)
-            val cache = InMemoryConstructorStandingsCache()
+            val cacheProvider = CacheRegistry()
 
-            cache.put(
+            cacheProvider.putFallback(
+                CacheSpec.CONSTRUCTOR_STANDINGS,
                 "current",
-                CacheEntry(
-                    data = StandingsData("2026", 3, sampleConstructorStandings),
-                    fetchedAt = Instant.now().minusSeconds(90_000),
-                    expiresAt = Instant.now().minusSeconds(3_600),
-                ),
+                StandingsData("2026", 3, sampleConstructorStandings),
             )
             dataSource.shouldFail = true
 
-            standingsTestApp(dataSource, cache) {
+            standingsTestApp(dataSource, cacheProvider) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 

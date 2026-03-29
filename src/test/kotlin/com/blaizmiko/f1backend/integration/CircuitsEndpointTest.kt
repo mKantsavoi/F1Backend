@@ -1,13 +1,13 @@
 package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.CircuitsResponse
-import com.blaizmiko.f1backend.adapter.port.CircuitCache
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.adapter.route.circuitRoutes
-import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.Circuit
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.port.CircuitDataSource
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryCircuitCache
+import com.blaizmiko.f1backend.infrastructure.cache.CacheRegistry
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import com.blaizmiko.f1backend.usecase.GetCircuits
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
@@ -32,7 +32,6 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
-import java.time.Instant
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse as Err
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
@@ -75,7 +74,7 @@ class CircuitsEndpointTest :
 
         fun circuitsTestApp(
             dataSource: CircuitDataSource,
-            cache: CircuitCache = InMemoryCircuitCache(),
+            cacheProvider: CacheProvider = CacheRegistry(),
             block: suspend ApplicationTestBuilder.() -> Unit,
         ) = testApplication {
             install(ServerContentNegotiation) {
@@ -107,7 +106,7 @@ class CircuitsEndpointTest :
                 }
             }
 
-            val getCircuits = GetCircuits(cache, dataSource)
+            val getCircuits = GetCircuits(cacheProvider, dataSource)
 
             install(Koin) {
                 modules(
@@ -196,18 +195,13 @@ class CircuitsEndpointTest :
 
         "stale cache fallback: returns data with Warning header when source fails" {
             val dataSource = FakeCircuitDataSource(circuits = sampleCircuits)
-            val cache = InMemoryCircuitCache()
+            val cacheProvider = CacheRegistry()
 
-            cache.put(
-                CacheEntry(
-                    data = sampleCircuits,
-                    fetchedAt = Instant.now().minusSeconds(90_000),
-                    expiresAt = Instant.now().minusSeconds(3_600),
-                ),
-            )
+            // Pre-populate the fallback map to simulate stale data
+            cacheProvider.putFallback(CacheSpec.CIRCUITS, "all", sampleCircuits)
             dataSource.shouldFail = true
 
-            circuitsTestApp(dataSource, cache) {
+            circuitsTestApp(dataSource, cacheProvider) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 
