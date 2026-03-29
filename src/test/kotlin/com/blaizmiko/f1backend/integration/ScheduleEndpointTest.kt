@@ -2,16 +2,15 @@ package com.blaizmiko.f1backend.integration
 
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse
 import com.blaizmiko.f1backend.adapter.dto.ScheduleResponse
-import com.blaizmiko.f1backend.adapter.port.ScheduleCache
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.adapter.route.scheduleRoutes
-import com.blaizmiko.f1backend.domain.model.CacheEntry
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.RaceWeekend
 import com.blaizmiko.f1backend.domain.model.SeasonCache
 import com.blaizmiko.f1backend.domain.model.Sessions
 import com.blaizmiko.f1backend.domain.port.ScheduleDataSource
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryNextRaceCache
-import com.blaizmiko.f1backend.infrastructure.cache.InMemoryScheduleCache
+import com.blaizmiko.f1backend.infrastructure.cache.CacheRegistry
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import com.blaizmiko.f1backend.usecase.GetNextRace
 import com.blaizmiko.f1backend.usecase.GetSchedule
 import io.kotest.core.spec.style.StringSpec
@@ -37,7 +36,6 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
-import java.time.Instant
 import com.blaizmiko.f1backend.adapter.dto.ErrorResponse as Err
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
@@ -86,7 +84,7 @@ class ScheduleEndpointTest :
 
         fun scheduleTestApp(
             dataSource: ScheduleDataSource,
-            cache: ScheduleCache = InMemoryScheduleCache(),
+            cacheProvider: CacheProvider = CacheRegistry(),
             cacheTtlHours: Long = 24,
             block: suspend ApplicationTestBuilder.() -> Unit,
         ) = testApplication {
@@ -120,9 +118,8 @@ class ScheduleEndpointTest :
                 }
             }
 
-            val nextRaceCache = InMemoryNextRaceCache()
-            val getSchedule = GetSchedule(cache, dataSource, cacheTtlHours)
-            val getNextRace = GetNextRace(nextRaceCache, dataSource)
+            val getSchedule = GetSchedule(cacheProvider, dataSource, cacheTtlHours)
+            val getNextRace = GetNextRace(cacheProvider, dataSource)
 
             install(Koin) {
                 modules(
@@ -217,19 +214,12 @@ class ScheduleEndpointTest :
 
         "stale cache fallback: returns data with Warning header when source fails" {
             val dataSource = FakeScheduleDataSource(races = sampleRaces, season = "2026")
-            val cache = InMemoryScheduleCache()
+            val cacheProvider = CacheRegistry()
 
-            cache.put(
-                "current",
-                CacheEntry(
-                    data = SeasonCache("2026", sampleRaces),
-                    fetchedAt = Instant.now().minusSeconds(90_000),
-                    expiresAt = Instant.now().minusSeconds(3_600),
-                ),
-            )
+            cacheProvider.putFallback(CacheSpec.SCHEDULE, "current", SeasonCache("2026", sampleRaces))
             dataSource.shouldFail = true
 
-            scheduleTestApp(dataSource, cache) {
+            scheduleTestApp(dataSource, cacheProvider) {
                 val client = createClient { install(ContentNegotiation) { json() } }
                 val token = generateToken()
 

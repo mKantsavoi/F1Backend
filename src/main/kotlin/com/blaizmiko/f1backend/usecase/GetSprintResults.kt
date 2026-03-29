@@ -1,12 +1,12 @@
 package com.blaizmiko.f1backend.usecase
 
-import com.blaizmiko.f1backend.adapter.port.RaceResultCache
-import com.blaizmiko.f1backend.domain.model.CacheEntry
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.NotFoundException
 import com.blaizmiko.f1backend.domain.model.RaceResult
 import com.blaizmiko.f1backend.domain.port.RaceDataSource
 import com.blaizmiko.f1backend.domain.port.SprintResultsData
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,12 +23,11 @@ data class SprintResultsResult(
 )
 
 class GetSprintResults(
-    private val cache: RaceResultCache,
+    private val cacheProvider: CacheProvider,
     private val dataSource: RaceDataSource,
 ) {
     companion object {
         private const val RETRY_THROTTLE_SECONDS = 60L
-        private const val CURRENT_SEASON_TTL_SECONDS = 300L
         private val NO_SPRINT = SprintResultsData("", 0, "", emptyList())
     }
 
@@ -40,31 +39,35 @@ class GetSprintResults(
         round: Int,
     ): SprintResultsResult {
         val key = "sprint:$season:$round"
-        val quickCached = cache.get(key)
-        if (quickCached != null && quickCached.isFresh()) {
+        val spec = specForSeason(season)
+        val cache = cacheProvider.getCache<String, SprintResultsData>(spec)
+        val quickCached = cache.getIfPresent(key)
+        if (quickCached != null) {
             throwIfNoSprint(quickCached, season, round)
             return toResult(quickCached, false)
         }
 
         val mutex = fetchMutexes.getOrPut(key) { Mutex() }
-        return mutex.withLock { fetchOrServeCached(season, round, key) }
+        return mutex.withLock { fetchOrServeCached(season, round, key, spec) }
     }
 
     private suspend fun fetchOrServeCached(
         season: String,
         round: Int,
         key: String,
+        spec: CacheSpec,
     ): SprintResultsResult {
-        val cached = cache.get(key)
+        val cache = cacheProvider.getCache<String, SprintResultsData>(spec)
+        val cached = cache.getIfPresent(key)
 
-        if (cached != null && cached.isFresh()) {
+        if (cached != null) {
             throwIfNoSprint(cached, season, round)
             return toResult(cached, false)
         }
 
         return when {
-            isThrottled(key) -> staleOrThrow(cached)
-            else -> tryFetch(season, round, key, cached)
+            isThrottled(key) -> staleOrThrow(cached, key, spec)
+            else -> tryFetch(season, round, key, spec)
         }
     }
 
@@ -78,20 +81,14 @@ class GetSprintResults(
         season: String,
         round: Int,
         key: String,
-        cached: CacheEntry<Any>?,
+        spec: CacheSpec,
     ): SprintResultsResult =
         try {
             val data = dataSource.fetchSprintResults(season, round)
-            val now = Instant.now()
-            val isCurrentSeason = season == Year.now().value.toString()
             val cacheData = data ?: NO_SPRINT
-            val entry =
-                CacheEntry(
-                    data = cacheData as Any,
-                    fetchedAt = now,
-                    expiresAt = if (isCurrentSeason) now.plusSeconds(CURRENT_SEASON_TTL_SECONDS) else Instant.MAX,
-                )
-            cache.put(key, entry)
+            val cache = cacheProvider.getCache<String, SprintResultsData>(spec)
+            cache.put(key, cacheData)
+            cacheProvider.putFallback(spec, key, cacheData)
             lastFailedAttempt.remove(key)
 
             if (data == null) {
@@ -111,41 +108,47 @@ class GetSprintResults(
             throw e
         } catch (_: Exception) {
             lastFailedAttempt[key] = Instant.now()
-            staleOrThrow(cached)
+            staleOrThrow(null, key, spec)
         }
 
-    @Suppress("UNCHECKED_CAST")
     private fun toResult(
-        cached: CacheEntry<Any>,
+        data: SprintResultsData,
         isStale: Boolean,
-    ): SprintResultsResult {
-        val data = cached.data as SprintResultsData
-        return SprintResultsResult(
+    ): SprintResultsResult =
+        SprintResultsResult(
             season = data.season,
             round = data.round,
             raceName = data.raceName,
             results = data.results,
             isStale = isStale,
         )
-    }
 
     private fun throwIfNoSprint(
-        cached: CacheEntry<Any>,
+        data: SprintResultsData,
         season: String,
         round: Int,
     ) {
-        if (cached.data === NO_SPRINT) {
+        if (data === NO_SPRINT) {
             throw NotFoundException("No sprint results found for season $season round $round")
         }
     }
 
-    private fun staleOrThrow(cached: CacheEntry<Any>?): SprintResultsResult {
-        if (cached != null) {
-            if (cached.data === NO_SPRINT) {
+    @Suppress("UNCHECKED_CAST")
+    private fun staleOrThrow(
+        cached: SprintResultsData?,
+        key: String,
+        spec: CacheSpec,
+    ): SprintResultsResult {
+        val fallback = cached ?: cacheProvider.getFallback<String>(spec, key) as? SprintResultsData
+        if (fallback != null) {
+            if (fallback === NO_SPRINT) {
                 throw NotFoundException("No sprint results available")
             }
-            return toResult(cached, true)
+            return toResult(fallback, true)
         }
         throw ExternalServiceException("Unable to fetch sprint results. Please try again later.")
     }
+
+    private fun specForSeason(season: String): CacheSpec =
+        if (season == Year.now().value.toString()) CacheSpec.SPRINT else CacheSpec.SPRINT_HISTORICAL
 }

@@ -1,10 +1,9 @@
 package com.blaizmiko.f1backend.usecase
 
-import com.blaizmiko.f1backend.adapter.port.NextRaceCache
-import com.blaizmiko.f1backend.domain.model.CacheEntry
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.RaceWeekend
-import com.blaizmiko.f1backend.domain.port.ScheduleDataSource
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -17,38 +16,36 @@ data class NextRaceResult(
 )
 
 class GetNextRace(
-    private val cache: NextRaceCache,
-    private val dataSource: ScheduleDataSource,
+    private val cacheProvider: CacheProvider,
+    private val dataSource: com.blaizmiko.f1backend.domain.port.ScheduleDataSource,
 ) {
     companion object {
         private const val RETRY_THROTTLE_SECONDS = 60L
-        private const val CACHE_TTL_SECONDS = 3600L
-        private const val SEASON_YEAR_LENGTH = 4
+        private const val CACHE_KEY = "next"
     }
 
+    private val cache = cacheProvider.getCache<String, NextRaceData>(CacheSpec.SCHEDULE_NEXT)
     private val fetchMutex = Mutex()
 
     @Volatile
     private var lastFailedAttempt: Instant? = null
 
     suspend fun execute(): NextRaceResult {
-        val quickCached = cache.get()
-        if (quickCached != null && quickCached.isFresh()) {
-            val season = quickCached.data?.let { extractSeason(it) } ?: ""
-            return NextRaceResult(season = season, race = quickCached.data, isStale = false)
+        val quickCached = cache.getIfPresent(CACHE_KEY)
+        if (quickCached != null) {
+            return NextRaceResult(season = quickCached.season, race = quickCached.race, isStale = false)
         }
 
         return fetchMutex.withLock { fetchOrServeCached() }
     }
 
     private suspend fun fetchOrServeCached(): NextRaceResult {
-        val cached = cache.get()
+        val cached = cache.getIfPresent(CACHE_KEY)
 
         return when {
-            cached != null && cached.isFresh() ->
-                NextRaceResult(season = extractSeason(cached.data), race = cached.data, isStale = false)
-            isThrottled() -> staleOrThrow(cached)
-            else -> tryFetch(cached)
+            cached != null -> NextRaceResult(season = cached.season, race = cached.race, isStale = false)
+            isThrottled() -> staleOrThrow()
+            else -> tryFetch()
         }
     }
 
@@ -58,17 +55,12 @@ class GetNextRace(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun tryFetch(cached: CacheEntry<RaceWeekend?>?): NextRaceResult =
+    private suspend fun tryFetch(): NextRaceResult =
         try {
             val (season, race) = dataSource.fetchNextRace()
-            val now = Instant.now()
-            val entry =
-                CacheEntry(
-                    data = race,
-                    fetchedAt = now,
-                    expiresAt = now.plusSeconds(CACHE_TTL_SECONDS),
-                )
-            cache.put(entry)
+            val data = NextRaceData(season, race)
+            cache.put(CACHE_KEY, data)
+            cacheProvider.putFallback(CacheSpec.SCHEDULE_NEXT, CACHE_KEY, data)
             lastFailedAttempt = null
 
             NextRaceResult(season = season, race = race, isStale = false)
@@ -76,19 +68,23 @@ class GetNextRace(
             throw e
         } catch (_: Exception) {
             lastFailedAttempt = Instant.now()
-            staleOrThrow(cached)
+            staleOrThrow()
         }
 
-    private fun staleOrThrow(cached: CacheEntry<RaceWeekend?>?): NextRaceResult {
-        if (cached != null) {
+    private fun staleOrThrow(): NextRaceResult {
+        val fallback = cacheProvider.getFallback<String>(CacheSpec.SCHEDULE_NEXT, CACHE_KEY) as? NextRaceData
+        if (fallback != null) {
             return NextRaceResult(
-                season = extractSeason(cached.data),
-                race = cached.data,
+                season = fallback.season,
+                race = fallback.race,
                 isStale = true,
             )
         }
         throw ExternalServiceException("Unable to fetch next race data. Please try again later.")
     }
-
-    private fun extractSeason(race: RaceWeekend?): String = race?.date?.take(SEASON_YEAR_LENGTH) ?: ""
 }
+
+internal data class NextRaceData(
+    val season: String,
+    val race: RaceWeekend?,
+)

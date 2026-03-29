@@ -18,6 +18,7 @@ import com.blaizmiko.f1backend.domain.port.RaceDataSource
 import com.blaizmiko.f1backend.domain.port.RaceResultsData
 import com.blaizmiko.f1backend.domain.port.SprintResultsData
 import com.blaizmiko.f1backend.domain.port.StandingsDataSource
+import com.blaizmiko.f1backend.infrastructure.cache.CacheRegistry
 import com.blaizmiko.f1backend.infrastructure.persistence.DatabaseFactory
 import com.blaizmiko.f1backend.infrastructure.persistence.repository.ExposedDriverRepository
 import com.blaizmiko.f1backend.infrastructure.persistence.repository.ExposedFavoriteRepository
@@ -306,20 +307,12 @@ class FavoritesEndpointTest :
                         ): SprintResultsData? = null
                     }
 
-                val driverStandingsCache =
-                    com.blaizmiko.f1backend.infrastructure.cache
-                        .InMemoryDriverStandingsCache()
-                val constructorStandingsCache =
-                    com.blaizmiko.f1backend.infrastructure.cache
-                        .InMemoryConstructorStandingsCache()
-                val raceResultCache =
-                    com.blaizmiko.f1backend.infrastructure.cache
-                        .InMemoryRaceResultCache()
+                val cacheProvider = CacheRegistry()
 
-                val getDriverStandings = GetDriverStandings(driverStandingsCache, fakeStandingsDataSource)
+                val getDriverStandings = GetDriverStandings(cacheProvider, fakeStandingsDataSource)
                 val getConstructorStandings =
-                    GetConstructorStandings(constructorStandingsCache, fakeStandingsDataSource)
-                val getRaceResults = GetRaceResults(raceResultCache, fakeRaceDataSource)
+                    GetConstructorStandings(cacheProvider, fakeStandingsDataSource)
+                val getRaceResults = GetRaceResults(cacheProvider, fakeRaceDataSource)
 
                 install(Koin) {
                     modules(
@@ -340,6 +333,7 @@ class FavoritesEndpointTest :
                                     getDriverStandings,
                                     getConstructorStandings,
                                     getRaceResults,
+                                    cacheProvider,
                                 )
                             }
                         },

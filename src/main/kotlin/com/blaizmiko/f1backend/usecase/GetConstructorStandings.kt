@@ -1,11 +1,11 @@
 package com.blaizmiko.f1backend.usecase
 
-import com.blaizmiko.f1backend.adapter.port.ConstructorStandingsCache
-import com.blaizmiko.f1backend.domain.model.CacheEntry
+import com.blaizmiko.f1backend.adapter.port.CacheProvider
 import com.blaizmiko.f1backend.domain.model.ConstructorStanding
 import com.blaizmiko.f1backend.domain.model.ExternalServiceException
 import com.blaizmiko.f1backend.domain.model.StandingsData
 import com.blaizmiko.f1backend.domain.port.StandingsDataSource
+import com.blaizmiko.f1backend.infrastructure.cache.CacheSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,21 +21,22 @@ data class ConstructorStandingsResult(
 )
 
 class GetConstructorStandings(
-    private val cache: ConstructorStandingsCache,
+    private val cacheProvider: CacheProvider,
     private val dataSource: StandingsDataSource,
 ) {
     companion object {
         private const val RETRY_THROTTLE_SECONDS = 60L
-        private const val CURRENT_SEASON_TTL_SECONDS = 3600L
     }
 
     private val fetchMutexes = ConcurrentHashMap<String, Mutex>()
     private val lastFailedAttempt = ConcurrentHashMap<String, Instant>()
 
     suspend fun execute(season: String = "current"): ConstructorStandingsResult {
-        val quickCached = cache.get(season)
-        if (quickCached != null && quickCached.isFresh()) {
-            return freshResult(quickCached.data)
+        val spec = specForSeason(season)
+        val cache = cacheProvider.getCache<String, StandingsData<ConstructorStanding>>(spec)
+        val quickCached = cache.getIfPresent(season)
+        if (quickCached != null) {
+            return freshResult(quickCached)
         }
 
         val mutex = fetchMutexes.getOrPut(season) { Mutex() }
@@ -43,12 +44,14 @@ class GetConstructorStandings(
     }
 
     private suspend fun fetchOrServeCached(season: String): ConstructorStandingsResult {
-        val cached = cache.get(season)
+        val spec = specForSeason(season)
+        val cache = cacheProvider.getCache<String, StandingsData<ConstructorStanding>>(spec)
+        val cached = cache.getIfPresent(season)
 
         return when {
-            cached != null && cached.isFresh() -> freshResult(cached.data)
-            isThrottled(season) -> staleOrThrow(cached)
-            else -> tryFetch(season, cached)
+            cached != null -> freshResult(cached)
+            isThrottled(season) -> staleOrThrow(season)
+            else -> tryFetch(season)
         }
     }
 
@@ -58,26 +61,13 @@ class GetConstructorStandings(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun tryFetch(
-        season: String,
-        cached: CacheEntry<StandingsData<ConstructorStanding>>?,
-    ): ConstructorStandingsResult =
+    private suspend fun tryFetch(season: String): ConstructorStandingsResult =
         try {
             val data = dataSource.fetchConstructorStandings(season)
-            val now = Instant.now()
-            val ttl =
-                if (data.season == Year.now().value.toString()) {
-                    CURRENT_SEASON_TTL_SECONDS
-                } else {
-                    Long.MAX_VALUE / 2
-                }
-            val entry =
-                CacheEntry(
-                    data = data,
-                    fetchedAt = now,
-                    expiresAt = if (ttl == Long.MAX_VALUE / 2) Instant.MAX else now.plusSeconds(ttl),
-                )
-            cache.put(season, entry)
+            val spec = specForResolvedSeason(data.season)
+            val cache = cacheProvider.getCache<String, StandingsData<ConstructorStanding>>(spec)
+            cache.put(season, data)
+            cacheProvider.putFallback(spec, season, data)
             lastFailedAttempt.remove(season)
 
             freshResult(data)
@@ -85,7 +75,7 @@ class GetConstructorStandings(
             throw e
         } catch (_: Exception) {
             lastFailedAttempt[season] = Instant.now()
-            staleOrThrow(cached)
+            staleOrThrow(season)
         }
 
     private fun freshResult(data: StandingsData<ConstructorStanding>): ConstructorStandingsResult =
@@ -96,15 +86,33 @@ class GetConstructorStandings(
             isStale = false,
         )
 
-    private fun staleOrThrow(cached: CacheEntry<StandingsData<ConstructorStanding>>?): ConstructorStandingsResult {
-        if (cached != null) {
-            return ConstructorStandingsResult(
-                season = cached.data.season,
-                round = cached.data.round,
-                standings = cached.data.standings,
-                isStale = true,
-            )
+    @Suppress("UNCHECKED_CAST")
+    private fun staleOrThrow(season: String): ConstructorStandingsResult {
+        for (spec in listOf(CacheSpec.CONSTRUCTOR_STANDINGS, CacheSpec.CONSTRUCTOR_STANDINGS_HISTORICAL)) {
+            val fallback = cacheProvider.getFallback<String>(spec, season) as? StandingsData<ConstructorStanding>
+            if (fallback != null) {
+                return ConstructorStandingsResult(
+                    season = fallback.season,
+                    round = fallback.round,
+                    standings = fallback.standings,
+                    isStale = true,
+                )
+            }
         }
         throw ExternalServiceException("Unable to fetch constructor standings. Please try again later.")
     }
+
+    private fun specForSeason(season: String): CacheSpec =
+        if (season == "current" || season == Year.now().value.toString()) {
+            CacheSpec.CONSTRUCTOR_STANDINGS
+        } else {
+            CacheSpec.CONSTRUCTOR_STANDINGS_HISTORICAL
+        }
+
+    private fun specForResolvedSeason(resolvedSeason: String): CacheSpec =
+        if (resolvedSeason == Year.now().value.toString()) {
+            CacheSpec.CONSTRUCTOR_STANDINGS
+        } else {
+            CacheSpec.CONSTRUCTOR_STANDINGS_HISTORICAL
+        }
 }

@@ -2,6 +2,7 @@ package com.blaizmiko.f1backend
 
 import com.blaizmiko.f1backend.infrastructure.config.loadAppConfig
 import com.blaizmiko.f1backend.infrastructure.di.authModule
+import com.blaizmiko.f1backend.infrastructure.di.cacheModule
 import com.blaizmiko.f1backend.infrastructure.di.circuitsModule
 import com.blaizmiko.f1backend.infrastructure.di.clientModule
 import com.blaizmiko.f1backend.infrastructure.di.coreModule
@@ -34,6 +35,7 @@ fun Application.module() {
         slf4jLogger()
         modules(
             coreModule(appConfig),
+            cacheModule,
             clientModule,
             authModule,
             driversModule,
